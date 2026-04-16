@@ -6,6 +6,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+class _NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            import numpy as np
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        except ImportError:
+            pass
+        return super().default(obj)
+
+def _dumps(obj, **kwargs):
+    return json.dumps(obj, cls=_NumpyEncoder, **kwargs)
+
 def build_prompt(
     client: str,
     month: str,
@@ -27,18 +44,18 @@ Meta:   Revenue ${kpis['meta']['revenue']:,.2f} | Cost ${kpis['meta']['cost']:,.
 Total:  Revenue ${kpis['totals']['revenue']:,.2f} | Cost ${kpis['totals']['cost']:,.2f} | ROAS {kpis['totals']['roas']}
 
 === FUNNEL BREAKDOWN ===
-Google TOF: {json.dumps(kpis['google_funnels'].get('TOF', {}))}
-Google MOF: {json.dumps(kpis['google_funnels'].get('MOF', {}))}
-Google BOF: {json.dumps(kpis['google_funnels'].get('BOF', {}))}
-Meta TOF: {json.dumps(kpis['meta_funnels'].get('TOF', {}))}
-Meta MOF: {json.dumps(kpis['meta_funnels'].get('MOF', {}))}
-Meta BOF: {json.dumps(kpis['meta_funnels'].get('BOF', {}))}
+Google TOF: {_dumps(kpis['google_funnels'].get('TOF', {}))}
+Google MOF: {_dumps(kpis['google_funnels'].get('MOF', {}))}
+Google BOF: {_dumps(kpis['google_funnels'].get('BOF', {}))}
+Meta TOF: {_dumps(kpis['meta_funnels'].get('TOF', {}))}
+Meta MOF: {_dumps(kpis['meta_funnels'].get('MOF', {}))}
+Meta BOF: {_dumps(kpis['meta_funnels'].get('BOF', {}))}
 
 === TOP ADS (Google) ===
-{json.dumps(kpis['google_top_ads'][:5], indent=2)}
+{_dumps(kpis['google_top_ads'][:5], indent=2)}
 
 === TOP ADS (Meta) ===
-{json.dumps(kpis['meta_top_ads'][:5], indent=2)}
+{_dumps(kpis['meta_top_ads'][:5], indent=2)}
 
 === USER OVERRIDES (Slide 4 only) ===
 Company Revenue: ${user_overrides.get('company_revenue', 0):,.2f}
