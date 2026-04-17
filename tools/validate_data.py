@@ -7,6 +7,15 @@ REQUIRED_COLUMNS = [
     "Leads", "Click", "Impressions", "Average Order Value"
 ]
 
+SUPPORTED_TRAFFIC_SOURCES = {
+    "google": "google",
+    "meta": "meta",
+    "bing": "bing",
+    "bing ads": "bing",
+    "microsoft": "bing",
+    "microsoft ads": "bing",
+}
+
 def load_sheet(path: Union[str, Path], sheet_name: str, client: str) -> pd.DataFrame:
     """
     Load a sheet from the Hyros xlsx export and filter by Client column.
@@ -27,20 +36,29 @@ def load_sheet(path: Union[str, Path], sheet_name: str, client: str) -> pd.DataF
 
 def run_checkpoints(df: pd.DataFrame) -> dict:
     """
-    Run the 4 mandatory verification checkpoints.
+    Run the mandatory verification checkpoints.
     Returns dict with checkpoint_N_passed keys and computed totals.
     """
     tol = 0.01  # $0.01 tolerance for floating point
 
-    google = df[df["Traffic Source"].str.lower() == "google"]
-    meta   = df[df["Traffic Source"].str.lower() == "meta"]
+    source_labels = df["Traffic Source"].astype(str).str.strip().str.lower()
+    canonical_sources = source_labels.map(SUPPORTED_TRAFFIC_SOURCES)
+    google = df[canonical_sources == "google"]
+    meta   = df[canonical_sources == "meta"]
+    bing   = df[canonical_sources == "bing"]
+    supported = df[canonical_sources.notna()]
+    unknown_sources = sorted(set(source_labels[canonical_sources.isna()]))
 
     google_cost  = google["Cost"].sum()
     meta_cost    = meta["Cost"].sum()
+    bing_cost    = bing["Cost"].sum()
+    supported_cost = supported["Cost"].sum()
     total_cost   = df["Cost"].sum()
 
     google_sales = google["Sales"].sum()
     meta_sales   = meta["Sales"].sum()
+    bing_sales   = bing["Sales"].sum()
+    supported_sales = supported["Sales"].sum()
     total_sales  = df["Sales"].sum()
 
     google_tof_sales = google[google["Funnel"].str.upper() == "TOF"]["Sales"].sum()
@@ -51,18 +69,27 @@ def run_checkpoints(df: pd.DataFrame) -> dict:
     meta_mof_sales = meta[meta["Funnel"].str.upper() == "MOF"]["Sales"].sum()
     meta_bof_sales = meta[meta["Funnel"].str.upper() == "BOF"]["Sales"].sum()
 
-    cp1 = bool(abs((google_cost + meta_cost) - total_cost) < tol)
-    cp2 = bool(abs((google_sales + meta_sales) - total_sales) < tol)
+    bing_tof_sales = bing[bing["Funnel"].str.upper() == "TOF"]["Sales"].sum()
+    bing_mof_sales = bing[bing["Funnel"].str.upper() == "MOF"]["Sales"].sum()
+    bing_bof_sales = bing[bing["Funnel"].str.upper() == "BOF"]["Sales"].sum()
+
+    cp1 = bool(not unknown_sources and abs(supported_cost - total_cost) < tol)
+    cp2 = bool(not unknown_sources and abs(supported_sales - total_sales) < tol)
     cp3 = bool(abs((google_tof_sales + google_mof_sales + google_bof_sales) - google_sales) < tol)
     cp4 = bool(abs((meta_tof_sales + meta_mof_sales + meta_bof_sales) - meta_sales) < tol)
+    cp5 = bool(abs((bing_tof_sales + bing_mof_sales + bing_bof_sales) - bing_sales) < tol)
 
     return {
         "checkpoint_1_passed": cp1,
         "checkpoint_2_passed": cp2,
         "checkpoint_3_passed": cp3,
         "checkpoint_4_passed": cp4,
-        "google_cost": google_cost, "meta_cost": meta_cost, "total_cost": total_cost,
-        "google_sales": google_sales, "meta_sales": meta_sales, "total_sales": total_sales,
+        "checkpoint_5_bing_funnel_sales_passed": cp5,
+        "unknown_traffic_sources": unknown_sources,
+        "google_cost": google_cost, "meta_cost": meta_cost, "bing_cost": bing_cost,
+        "supported_cost": supported_cost, "total_cost": total_cost,
+        "google_sales": google_sales, "meta_sales": meta_sales, "bing_sales": bing_sales,
+        "supported_sales": supported_sales, "total_sales": total_sales,
     }
 
 

@@ -1,73 +1,106 @@
 # Agent Instructions
 
-You're working inside the **WAT framework** (Workflows, Agents, Tools). This architecture separates concerns so that probabilistic AI handles reasoning while deterministic code handles execution. That separation is what makes this system reliable.
+This project now focuses on one production workflow:
 
-## The WAT Architecture
+**Google Sheets -> Python KPI logic -> Google Slides**
 
-**Layer 1: Workflows (The Instructions)**
-- Markdown SOPs stored in `workflows/`
-- Each workflow defines the objective, required inputs, which tools to use, expected outputs, and how to handle edge cases
-- Written in plain language, the same way you'd brief someone on your team
+The old local PPTX-editing path is retired. Do not reintroduce scripts that tag or edit PowerPoint files by replacing old visible numbers.
 
-**Layer 2: Agents (The Decision-Maker)**
-- This is your role. You're responsible for intelligent coordination.
-- Read the relevant workflow, run tools in the correct sequence, handle failures gracefully, and ask clarifying questions when needed
-- You connect intent to execution without trying to do everything yourself
-- Example: If you need to pull data from a website, don't attempt it directly. Read `workflows/scrape_website.md`, figure out the required inputs, then execute `tools/scrape_single_site.py`
+## Architecture
 
-**Layer 3: Tools (The Execution)**
-- Python scripts in `tools/` that do the actual work
-- API calls, data transformations, file operations, database queries
-- Credentials and API keys are stored in `.env`
-- These scripts are consistent, testable, and fast
+Use the WAT pattern:
 
-**Why this matters:** When AI tries to handle every step directly, accuracy drops fast. If each step is 90% accurate, you're down to 59% success after just five steps. By offloading execution to deterministic scripts, you stay focused on orchestration and decision-making where you excel.
+- **Workflows** live in `workflows/` and explain what to run.
+- **Tools** live in `tools/` and perform deterministic work.
+- **Agents** coordinate the workflow, inspect failures, and call tools in order.
 
-## How to Operate
+The main SOP is:
 
-**1. Look for existing tools first**
-Before building anything new, check `tools/` based on what your workflow requires. Only create new scripts when nothing exists for that task.
-
-**2. Learn and adapt when things fail**
-When you hit an error:
-- Read the full error message and trace
-- Fix the script and retest (if it uses paid API calls or credits, check with me before running again)
-- Document what you learned in the workflow (rate limits, timing quirks, unexpected behavior)
-- Example: You get rate-limited on an API, so you dig into the docs, discover a batch endpoint, refactor the tool to use it, verify it works, then update the workflow so this never happens again
-
-**3. Keep workflows current**
-Workflows should evolve as you learn. When you find better methods, discover constraints, or encounter recurring issues, update the workflow. That said, don't create or overwrite workflows without asking unless I explicitly tell you to. These are your instructions and need to be preserved and refined, not tossed after one use.
-
-## The Self-Improvement Loop
-
-Every failure is a chance to make the system stronger:
-1. Identify what broke
-2. Fix the tool
-3. Verify the fix works
-4. Update the workflow with the new approach
-5. Move on with a more robust system
-
-This loop is how the framework improves over time.
-
-## File Structure
-
-**What goes where:**
-- **Deliverables**: Final outputs go to cloud services (Google Sheets, Slides, etc.) where I can access them directly
-- **Intermediates**: Temporary processing files that can be regenerated
-
-**Directory layout:**
-```
-.tmp/           # Temporary files (scraped data, intermediate exports). Regenerated as needed.
-tools/          # Python scripts for deterministic execution
-workflows/      # Markdown SOPs defining what to do and how
-.env            # API keys and environment variables (NEVER store secrets anywhere else)
-credentials.json, token.json  # Google OAuth (gitignored)
+```text
+workflows/google_slides_monthly_report.md
 ```
 
-**Core principle:** Local files are just for processing. Anything I need to see or use lives in cloud services. Everything in `.tmp/` is disposable.
+## Source Of Truth
 
-## Bottom Line
+- Hyros campaign/ad data lives in Google Sheets.
+- Python calculates and validates KPIs.
+- Google Slides is the branded presentation template and final editable report.
+- Google Drive stores deliverables.
+- Local files are only for development, tests, or temporary exports.
 
-You sit between what I want (workflows) and what actually gets done (tools). Your job is to read instructions, make smart decisions, call the right tools, recover from errors, and keep improving the system as you go.
+## Live Tools
 
-Stay pragmatic. Stay reliable. Keep learning.
+Keep these as the core runtime:
+
+- `tools/validate_data.py`
+- `tools/calculate_kpis.py`
+- `tools/generate_insights.py`
+- `tools/report_insights.py`
+- `tools/report_replacements.py`
+- `tools/google_workspace.py`
+- `tools/google_sheet_report_data.py`
+- `tools/google_slides_report.py`
+- `tools/run_google_slides_report.py`
+
+## Template Rules
+
+- The branded report template must be a native Google Slides deck.
+- Put `{{TOKEN}}` placeholders only in intentional text boxes or table cells.
+- Run `--audit-only` before generating a real deck.
+- Never create placeholders by reverse-tagging old report numbers.
+- Prefer full-field tokens like `{{GOOGLE_TOF_SALES}}` or full narrative boxes like `{{GOOGLE_NEXT_STEPS}}`.
+- Use `workflows/template_placeholder_map.md` when building or reviewing a template.
+
+## Credentials And Secrets
+
+Secrets stay local and out of git:
+
+- `.env`
+- `.env.local`
+- `credentials.json`
+- `token.pickle`
+- `token_workspace.pickle`
+- service-account JSON files
+
+Safe examples belong in `.env.example`.
+
+## Normal Run
+
+Audit first:
+
+```bash
+python3 tools/run_google_slides_report.py \
+  --spreadsheet "GOOGLE_SHEET_URL_OR_ID" \
+  --template-presentation "GOOGLE_SLIDES_TEMPLATE_URL_OR_ID" \
+  --client "One Funded" \
+  --month March --year 2026 \
+  --prev-month February --next-month April \
+  --audit-only
+```
+
+Generate after the audit passes:
+
+```bash
+python3 tools/run_google_slides_report.py \
+  --spreadsheet "GOOGLE_SHEET_URL_OR_ID" \
+  --template-presentation "GOOGLE_SLIDES_TEMPLATE_URL_OR_ID" \
+  --client "One Funded" \
+  --month March --year 2026 \
+  --prev-month February --next-month April \
+  --company-revenue 93051 \
+  --thumbnail-audit
+```
+
+Add `--use-claude` only when generating final narrative copy.
+
+## Verification
+
+Before calling a change done, run:
+
+```bash
+python3 -m pytest -q
+python3 -m py_compile tools/*.py
+python3 tools/run_google_slides_report.py --help
+```
+
+If a command uses paid APIs or creates client-visible reports, run a dry audit first and make the side effect explicit.

@@ -30,6 +30,27 @@ def test_checkpoint_4_meta_funnel_sales(valid_campaigns_df):
     result = run_checkpoints(valid_campaigns_df)
     assert result["checkpoint_4_passed"] is True
 
+def test_checkpoints_include_bing_as_supported_source(valid_campaigns_df):
+    with_bing = pd.concat(
+        [
+            valid_campaigns_df,
+            pd.DataFrame(
+                [
+                    {"Traffic Source": "bing", "Funnel": "TOF", "Cost": 10.0, "Total Revenue": 20.0, "Sales": 1.0, "Leads": 2.0, "Click": 10, "Impressions": 100, "Average Order Value": 20.0},
+                    {"Traffic Source": "Microsoft Ads", "Funnel": "MOF", "Cost": 20.0, "Total Revenue": 80.0, "Sales": 2.0, "Leads": 4.0, "Click": 20, "Impressions": 200, "Average Order Value": 40.0},
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    result = run_checkpoints(with_bing)
+
+    assert result["checkpoint_1_passed"] is True
+    assert result["checkpoint_2_passed"] is True
+    assert result["checkpoint_5_bing_funnel_sales_passed"] is True
+    assert result["bing_sales"] == 3.0
+
 def test_checkpoint_fails_on_bad_data():
     bad_df = pd.DataFrame([
         {"Traffic Source": "google", "Funnel": "TOF", "Cost": 100.0, "Total Revenue": 200.0, "Sales": 5.0, "Leads": 20.0, "Click": 100, "Impressions": 1000, "Average Order Value": 40.0},

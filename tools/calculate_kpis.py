@@ -80,6 +80,41 @@ def calculate_top_ads(df: pd.DataFrame, platform: str, n: int = 10) -> list:
         })
     return results
 
+
+def calculate_funnel_top_ads(df: pd.DataFrame, platform: str) -> dict:
+    """Return the highest-revenue ad row for each funnel stage."""
+    p = df[df["Traffic Source"].str.lower() == platform.lower()].copy()
+    result = {}
+    for funnel in ["TOF", "MOF", "BOF"]:
+        f = p[p["Funnel"].str.upper() == funnel].copy()
+        f = f[f["Total Revenue"] > 0].copy()
+        if f.empty:
+            result[funnel] = {}
+            continue
+        f = f.sort_values(["Total Revenue", "Sales"], ascending=[False, False])
+        row = f.iloc[0]
+        cost = float(row.get("Cost", 0))
+        revenue = float(row.get("Total Revenue", 0))  # Always use Total Revenue
+        sales = float(row.get("Sales", 0))
+        leads = float(row.get("Leads", 0))
+        clicks = float(row.get("Click", 0))
+        impressions = float(row.get("Impressions", 0))
+        result[funnel] = {
+            "source": str(row.get("Source", row.get("Source Link", "Unknown"))),
+            "source_link": str(row.get("Source Link", "")),
+            "cost": round(cost, 2),
+            "revenue": round(revenue, 2),
+            "sales": round(sales, 0),
+            "leads": round(leads, 0),
+            "clicks": round(clicks, 0),
+            "impressions": round(impressions, 0),
+            "roas": round(_safe_divide(revenue, cost), 2),
+            "cps": round(_safe_divide(cost, sales), 2),
+            "l2s_pct": round(_safe_divide(sales, leads) * 100, 2),
+            "cvr_pct": round(_safe_divide(sales, clicks) * 100, 2),
+        }
+    return result
+
 _BING_NAMES = {"bing", "microsoft", "microsoft ads", "bing ads"}
 
 
@@ -93,7 +128,7 @@ def _detect_bing_label(df: pd.DataFrame) -> Optional[str]:
 
 def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> dict:
     """
-    Build the complete KPI dict consumed by generate_insights and fill_pptx.
+    Build the complete KPI dict consumed by generate_insights and report replacement helpers.
     All revenue figures derive from the "Total Revenue" column.
     Bing is included when present; silently omitted when not in the data.
     """
@@ -116,6 +151,8 @@ def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> d
         "meta":           meta,
         "google_funnels": calculate_funnel_kpis(campaigns_df, "google"),
         "meta_funnels":   calculate_funnel_kpis(campaigns_df, "meta"),
+        "google_funnel_cards": calculate_funnel_top_ads(ads_df, "google"),
+        "meta_funnel_cards":   calculate_funnel_top_ads(ads_df, "meta"),
         "google_top_ads": calculate_top_ads(ads_df, "google"),
         "meta_top_ads":   calculate_top_ads(ads_df, "meta"),
         "totals": {
@@ -137,6 +174,7 @@ def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> d
     if bing:
         result["bing"]         = bing
         result["bing_funnels"] = calculate_funnel_kpis(campaigns_df, bing_label)
+        result["bing_funnel_cards"] = calculate_funnel_top_ads(ads_df, bing_label)
         result["bing_top_ads"] = calculate_top_ads(ads_df, bing_label)
 
     return result
