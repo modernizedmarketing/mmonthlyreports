@@ -40,11 +40,18 @@ def get_workspace_credentials(
     the existing installed-app OAuth flow is used and persisted locally.
     """
     scopes = list(scopes or WORKSPACE_SCOPES)
-    service_account_file = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE")
+    service_account_file = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
 
     if service_account_file:
+        service_account_path = Path(service_account_file)
+        if not service_account_path.exists():
+            raise FileNotFoundError(
+                "GOOGLE_SERVICE_ACCOUNT_FILE points to a missing file: "
+                f"{service_account_path}. Mount a valid service-account JSON in Cloud Run "
+                "or unset GOOGLE_SERVICE_ACCOUNT_FILE for local OAuth."
+            )
         return service_account.Credentials.from_service_account_file(
-            service_account_file,
+            str(service_account_path),
             scopes=scopes,
         )
 
@@ -63,6 +70,12 @@ def get_workspace_credentials(
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
+            if not creds_path.exists():
+                raise FileNotFoundError(
+                    "Google Workspace credentials not found. For local development, add "
+                    f"{creds_path} or an existing token file. For Cloud Run, set "
+                    "GOOGLE_SERVICE_ACCOUNT_FILE to a mounted service-account JSON."
+                )
             flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), scopes)
             creds = flow.run_local_server(port=0)
         with open(token_path, "wb") as handle:
@@ -84,7 +97,7 @@ def build_workspace_services(credentials: Credentials | None = None) -> dict:
 def extract_file_id(value: str) -> str:
     """Extract a Drive/Docs/Sheets/Slides file ID from a raw ID or URL."""
     value = value.strip()
-    markers = ["/d/", "id="]
+    markers = ["/d/", "/folders/", "id="]
     for marker in markers:
         if marker in value:
             tail = value.split(marker, 1)[1]

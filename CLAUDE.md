@@ -39,8 +39,12 @@ Keep these as the core runtime:
 - `tools/report_replacements.py`
 - `tools/google_workspace.py`
 - `tools/google_sheet_report_data.py`
+- `tools/control_sheet.py`
+- `tools/cloud_run_jobs.py`
 - `tools/google_slides_report.py`
 - `tools/run_google_slides_report.py`
+- `tools/run_control_sheet_reports.py`
+- `tools/report_ops_service.py`
 
 ## Template Rules
 
@@ -63,6 +67,16 @@ Secrets stay local and out of git:
 - service-account JSON files
 
 Safe examples belong in `.env.example`.
+
+For production and Cloud Run:
+
+- Use Python `3.11+`.
+- Prefer a Google service account via `GOOGLE_SERVICE_ACCOUNT_FILE`.
+- Share the source Sheet, Slides template, and Drive output folder with that service account.
+- Set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` only if you want AI-generated narrative copy.
+- Default monthly automation should use deterministic insights so runs never block on credits.
+- Set `MASTER_CONTROL_SHEET_ID` for the 14-client orchestration flow.
+- Set `CLOUD_RUN_PROJECT`, `CLOUD_RUN_REGION`, and `CLOUD_RUN_JOB_NAME` for the manual control panel service.
 
 ## Normal Run
 
@@ -91,7 +105,26 @@ python3 tools/run_google_slides_report.py \
   --thumbnail-audit
 ```
 
-Add `--use-claude` only when generating final narrative copy.
+To request AI narrative explicitly:
+
+```bash
+python3 tools/run_google_slides_report.py \
+  --spreadsheet "GOOGLE_SHEET_URL_OR_ID" \
+  --template-presentation "GOOGLE_SLIDES_TEMPLATE_URL_OR_ID" \
+  --client "One Funded" \
+  --month March --year 2026 \
+  --insights-provider auto
+```
+
+For multi-client orchestration from the master control sheet:
+
+```bash
+python3 tools/run_control_sheet_reports.py \
+  --control-sheet "MASTER_CONTROL_SHEET_URL_OR_ID" \
+  --run-mode all \
+  --month March --year 2026 \
+  --insights-provider deterministic
+```
 
 ## Verification
 
@@ -101,6 +134,10 @@ Before calling a change done, run:
 python3 -m pytest -q
 python3 -m py_compile tools/*.py
 python3 tools/run_google_slides_report.py --help
+python3 tools/run_control_sheet_reports.py --help
+docker build -t marketing-report-automation .
 ```
 
 If a command uses paid APIs or creates client-visible reports, run a dry audit first and make the side effect explicit.
+
+GitHub Actions should enforce the same release gate on PRs and pushes to `dev`/`main`.

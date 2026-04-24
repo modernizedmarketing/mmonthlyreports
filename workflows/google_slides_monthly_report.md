@@ -3,6 +3,10 @@
 ## Objective
 Generate a branded monthly Google Slides report from the canonical Google Sheet, using Python for KPI validation/calculation and Google Slides API replacement for the final deck.
 
+This workflow now supports both:
+- a per-client runner for one sheet/template pair, and
+- a master control sheet that orchestrates all active clients.
+
 ## Required Inputs
 - `spreadsheet` — Google Sheet URL or ID containing Hyros report data.
 - `template_presentation` — master Google Slides template URL or ID.
@@ -10,12 +14,39 @@ Generate a branded monthly Google Slides report from the canonical Google Sheet,
 - `month`, `year`, `prev_month`, `next_month`.
 - Optional overrides: `company_revenue`, `ad_revenue`, `ad_cost`, `prev_company_revenue`, `prev_ad_revenue`, `prev_ad_cost`, media buyer notes, special requests.
 
+## Runtime Contract
+- Production target is a Cloud Run job, not an always-on service.
+- Manual operator trigger target is a small Cloud Run service with a simple web page.
+- Use Python `3.11+`.
+- For Cloud Run, mount a service-account JSON and set `GOOGLE_SERVICE_ACCOUNT_FILE`.
+- For local development, leave `GOOGLE_SERVICE_ACCOUNT_FILE` unset and rely on `credentials.json` plus cached OAuth tokens.
+- `REPORT_INSIGHTS_PROVIDER` defaults to `deterministic` for no-credit-risk runs.
+- `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are optional unless you explicitly request those providers.
+- Set `GOOGLE_DRIVE_OUTPUT_FOLDER_ID` when the destination folder should come from environment defaults.
+- Set `MASTER_CONTROL_SHEET_ID` for the multi-client batch runner.
+- Set `CLOUD_RUN_PROJECT`, `CLOUD_RUN_REGION`, and `CLOUD_RUN_JOB_NAME` for the operator control panel.
+
 ## Required Google Sheet Tabs
 - `Campaigns` — Hyros campaign rows. Custom tab names can be passed with `--campaigns-sheet`.
 - `Ads` — Hyros ad rows. Custom tab names can be passed with `--ads-sheet`.
+
+Optional for single-client/manual runs only:
 - `Manual Inputs` — optional row-based or key/value inputs for company revenue, ad revenue, ad cost, notes, and requests.
-- `KPI Output` — written by the runner.
-- `Run Log` — appended by the runner.
+- `KPI Output` — can be written by the per-client runner when you explicitly want it.
+- `Run Log` — can be written by the per-client runner when you explicitly want it.
+
+Each client should keep only its own data in its own Google Sheet. Do not store multi-client routing in the client sheets.
+
+## Master Control Sheet
+Use one separate control sheet for orchestration across the 14 clients.
+
+- `Clients` tab:
+  - Required columns: `active`, `client_name`, `client_key`, `spreadsheet_url_or_id`, `template_presentation_url_or_id`, `output_folder_id`
+  - Optional columns: `campaigns_tab`, `ads_tab`, `timezone`, `insights_provider`
+- `Runs` tab:
+  - Centralized log for one row per client execution with provider used, deck URL, and error summary.
+
+The batch runner defaults to centralized logging only, so client sheets can stay minimal with just `Campaigns` and `Ads`.
 
 ## Template Rules
 - Use native Google Slides as the master template.
@@ -56,7 +87,26 @@ python3 tools/run_google_slides_report.py \
   --thumbnail-audit
 ```
 
-By default this uses fake/dry-run insights. Add `--use-claude` for final narrative generation after the template audit passes.
+By default this uses deterministic insights. Use `--insights-provider anthropic`, `openai`, or `auto` only when you want AI narrative and accept provider/API usage.
+
+## Run All Clients From The Control Sheet
+```bash
+python3 tools/run_control_sheet_reports.py \
+  --control-sheet "MASTER_CONTROL_SHEET_URL_OR_ID" \
+  --run-mode all \
+  --month March --year 2026 \
+  --insights-provider deterministic
+```
+
+To run one client only:
+
+```bash
+python3 tools/run_control_sheet_reports.py \
+  --control-sheet "MASTER_CONTROL_SHEET_URL_OR_ID" \
+  --run-mode one \
+  --client-key "one-funded" \
+  --month March --year 2026
+```
 
 ## One Funded Test Command
 ```bash
@@ -77,6 +127,26 @@ python3 tools/run_google_slides_report.py \
 This reads March as the current month and February as the previous month from the same spreadsheet, then fills both current and `_PREV` placeholders.
 
 ## Production Runner
-Use the same CLI inside a Cloud Run job. Set `GOOGLE_SERVICE_ACCOUNT_FILE` to a service-account JSON path or mount credentials through the runtime. Share the Sheet, Slides template, and Drive output folder with that service account.
+Use the same image for both Cloud Run surfaces:
 
-Cloud Scheduler or a manual Cloud Run trigger can run the job so report generation does not depend on a local Codex/Claude Code session.
+- Cloud Run Job:
+  - Runs `tools/run_control_sheet_reports.py`
+  - Handles `run all` or `run one`
+  - Reads master control sheet config
+- Cloud Run Service:
+  - Runs `tools/report_ops_service.py`
+  - Shows a simple internal web page for `Run all clients` and `Run one client`
+  - Launches the Cloud Run Job asynchronously through the Cloud Run Admin API
+
+Share the client Sheets, Slides templates, control sheet, and Drive output folders with the service account used by these workloads.
+
+Phase rollout:
+- Phase 1: use the Cloud Run service manually from the web page.
+- Phase 2: once the first full monthly run succeeds, add Cloud Scheduler to trigger the same backend on the first day of each month.
+
+## Release Gate
+- GitHub Actions must pass tests, script compilation, and `run_google_slides_report.py --help`.
+- `run_control_sheet_reports.py --help` must also pass.
+- The Docker image must build successfully from the repo root.
+- Run `--audit-only` against the real template before generating a client deck.
+- Do not ship a template that reports `missing_values`.

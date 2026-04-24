@@ -1,7 +1,12 @@
 # tests/test_generate_insights_dry.py
 import pytest
 from unittest.mock import patch, MagicMock
-from tools.generate_insights import build_prompt, generate_insights
+from tools.generate_insights import (
+    build_prompt,
+    generate_insights,
+    generate_insights_with_provider,
+    generate_openai_insights,
+)
 
 SAMPLE_KPIS = {
     "google": {"revenue": 10000, "cost": 4000, "sales": 50, "leads": 200, "clicks": 1000,
@@ -16,7 +21,7 @@ SAMPLE_KPIS = {
 }
 
 def test_build_prompt_contains_client_name():
-    prompt = build_prompt("Funded Profit", "March", 2026, "February", SAMPLE_KPIS, {})
+    prompt = build_prompt("Funded Profit", "March", 2026, "February", 2026, SAMPLE_KPIS, {})
     assert "Funded Profit" in prompt
     assert "March" in prompt
     assert "February" in prompt
@@ -28,8 +33,41 @@ def test_generate_insights_returns_dict(monkeypatch):
     with patch("tools.generate_insights.anthropic.Anthropic") as mock_cls:
         mock_cls.return_value.messages.create.return_value = mock_response
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-        result = generate_insights("Funded Profit", "March", 2026, "February", SAMPLE_KPIS, {})
+        result = generate_insights("Funded Profit", "March", 2026, "February", 2026, SAMPLE_KPIS, {})
 
     assert isinstance(result, dict)
     assert "slide3_general_insights" in result
     assert "action_items" in result
+
+
+def test_generate_insights_with_provider_falls_back_to_deterministic(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    result, provider = generate_insights_with_provider(
+        "auto",
+        client="Funded Profit",
+        month="March",
+        year=2026,
+        prev_month="February",
+        prev_year=2026,
+        kpis=SAMPLE_KPIS,
+        user_overrides={},
+        deterministic_factory=lambda: {"slide3_general_insights": "deterministic", "action_items": ["1", "2", "3", "4", "5"]},
+    )
+
+    assert provider == "deterministic"
+    assert result["slide3_general_insights"] == "deterministic"
+
+
+def test_generate_openai_insights_returns_dict(monkeypatch):
+    mock_response = MagicMock()
+    mock_response.output_text = '{"slide3_general_insights": "test", "slide3_budget_roas": "test", "slide3_strategy": "test", "google_top_performer": "test", "google_main_drop": "test", "google_next_steps": "test", "meta_top_performer": "test", "meta_main_drop": "test", "meta_next_steps": "test", "performance_manager_narrative": "test", "action_items": ["a", "b", "c", "d", "e"]}'
+
+    with patch("tools.generate_insights.OpenAI") as mock_cls:
+        mock_cls.return_value.responses.create.return_value = mock_response
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        result = generate_openai_insights("Funded Profit", "March", 2026, "February", 2026, SAMPLE_KPIS, {})
+
+    assert isinstance(result, dict)
+    assert result["action_items"][0] == "a"

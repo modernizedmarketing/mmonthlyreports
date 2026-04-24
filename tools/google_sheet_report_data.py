@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -17,6 +18,21 @@ NUMERIC_COLUMNS = [
     "Click",
     "Average Order Value",
 ]
+
+
+def _execute_with_retry(request, attempts: int = 3, delay_seconds: float = 1.0):
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return request.execute()
+        except TimeoutError as exc:
+            last_error = exc
+            if attempt == attempts:
+                raise
+            time.sleep(delay_seconds * attempt)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Request execution failed without raising an exception.")
 
 
 def _json_safe_cell(value: Any) -> Any:
@@ -103,8 +119,8 @@ def read_sheet_values(
         sheets_service.spreadsheets()
         .values()
         .get(spreadsheetId=spreadsheet_id, range=a1_range)
-        .execute()
     )
+    result = _execute_with_retry(result)
     return result.get("values", [])
 
 
@@ -192,7 +208,9 @@ def read_manual_inputs(
 
 
 def ensure_sheet_exists(sheets_service, spreadsheet_id: str, sheet_name: str) -> None:
-    metadata = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    metadata = _execute_with_retry(
+        sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id)
+    )
     existing = {
         sheet["properties"]["title"]
         for sheet in metadata.get("sheets", [])
@@ -200,10 +218,12 @@ def ensure_sheet_exists(sheets_service, spreadsheet_id: str, sheet_name: str) ->
     }
     if sheet_name in existing:
         return
-    sheets_service.spreadsheets().batchUpdate(
-        spreadsheetId=spreadsheet_id,
-        body={"requests": [{"addSheet": {"properties": {"title": sheet_name}}}]},
-    ).execute()
+    _execute_with_retry(
+        sheets_service.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={"requests": [{"addSheet": {"properties": {"title": sheet_name}}}]},
+        )
+    )
 
 
 def write_table(
@@ -218,17 +238,41 @@ def write_table(
     safe_rows = [[_json_safe_cell(value) for value in row] for row in rows]
     target = f"{quote_sheet_name(sheet_name)}!{start_cell}"
     if clear_first:
-        sheets_service.spreadsheets().values().clear(
+        _execute_with_retry(
+            sheets_service.spreadsheets().values().clear(
+                spreadsheetId=spreadsheet_id,
+                range=f"{quote_sheet_name(sheet_name)}!A:ZZ",
+                body={},
+            )
+        )
+    _execute_with_retry(
+        sheets_service.spreadsheets().values().update(
             spreadsheetId=spreadsheet_id,
-            range=f"{quote_sheet_name(sheet_name)}!A:ZZ",
-            body={},
-        ).execute()
-    sheets_service.spreadsheets().values().update(
-        spreadsheetId=spreadsheet_id,
-        range=target,
-        valueInputOption="USER_ENTERED",
-        body={"values": safe_rows},
-    ).execute()
+            range=target,
+            valueInputOption="USER_ENTERED",
+            body={"values": safe_rows},
+        )
+    )
+
+
+def ensure_sheet_headers(
+    sheets_service,
+    spreadsheet_id: str,
+    sheet_name: str,
+    headers: list[str],
+) -> None:
+    ensure_sheet_exists(sheets_service, spreadsheet_id, sheet_name)
+    existing = read_sheet_values(sheets_service, spreadsheet_id, sheet_name, "A1:Z1")
+    if existing:
+        return
+    _execute_with_retry(
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"{quote_sheet_name(sheet_name)}!A1",
+            valueInputOption="USER_ENTERED",
+            body={"values": [headers]},
+        )
+    )
 
 
 def flatten_kpis(kpis: dict[str, Any]) -> dict[str, Any]:
@@ -277,6 +321,7 @@ def append_run_log(
         "remaining_placeholders",
         "validation_json",
     ]
+    ensure_sheet_headers(sheets_service, spreadsheet_id, sheet_name, headers)
     values = [[row.get(header, "") for header in headers]]
     sheets_service.spreadsheets().values().append(
         spreadsheetId=spreadsheet_id,

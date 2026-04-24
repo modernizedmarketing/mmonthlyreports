@@ -2,12 +2,28 @@
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Any
 
 from tools.report_replacements import build_replacements
 
 PLACEHOLDER_RE = re.compile(r"\{\{[^}]+\}\}")
+
+
+def _execute_with_retry(request, attempts: int = 3, delay_seconds: float = 1.0):
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return request.execute()
+        except TimeoutError as exc:
+            last_error = exc
+            if attempt == attempts:
+                raise
+            time.sleep(delay_seconds * attempt)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Request execution failed without raising an exception.")
 
 
 def build_slides_replacements(
@@ -52,8 +68,8 @@ def copy_presentation(
             body=body,
             fields="id, name, webViewLink",
         )
-        .execute()
     )
+    copied = _execute_with_retry(copied)
     return {
         "id": copied["id"],
         "name": copied.get("name", title),
@@ -88,8 +104,8 @@ def replace_placeholders(
         response = (
             slides_service.presentations()
             .batchUpdate(presentationId=presentation_id, body={"requests": chunk})
-            .execute()
         )
+        response = _execute_with_retry(response)
         for reply in response.get("replies", []):
             occurrences += reply.get("replaceAllText", {}).get("occurrencesChanged", 0)
     return occurrences
@@ -124,7 +140,9 @@ def extract_placeholders_from_presentation(presentation: dict[str, Any]) -> set[
 
 
 def read_placeholders(slides_service, presentation_id: str) -> set[str]:
-    presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+    presentation = _execute_with_retry(
+        slides_service.presentations().get(presentationId=presentation_id)
+    )
     return extract_placeholders_from_presentation(presentation)
 
 
@@ -151,15 +169,19 @@ def find_sheets_chart_object_ids(presentation: dict[str, Any]) -> list[str]:
 
 
 def refresh_linked_sheets_charts(slides_service, presentation_id: str) -> int:
-    presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+    presentation = _execute_with_retry(
+        slides_service.presentations().get(presentationId=presentation_id)
+    )
     chart_ids = find_sheets_chart_object_ids(presentation)
     if not chart_ids:
         return 0
     requests = [{"refreshSheetsChart": {"objectId": object_id}} for object_id in chart_ids]
-    slides_service.presentations().batchUpdate(
-        presentationId=presentation_id,
-        body={"requests": requests},
-    ).execute()
+    _execute_with_retry(
+        slides_service.presentations().batchUpdate(
+            presentationId=presentation_id,
+            body={"requests": requests},
+        )
+    )
     return len(chart_ids)
 
 
@@ -171,7 +193,9 @@ def export_presentation(
 ) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    data = drive_service.files().export(fileId=presentation_id, mimeType=mime_type).execute()
+    data = _execute_with_retry(
+        drive_service.files().export(fileId=presentation_id, mimeType=mime_type)
+    )
     output_path.write_bytes(data)
     return output_path
 
@@ -192,8 +216,8 @@ def get_slide_thumbnail_urls(slides_service, presentation_id: str, max_slides: i
                 thumbnailProperties_mimeType="PNG",
                 thumbnailProperties_thumbnailSize="MEDIUM",
             )
-            .execute()
         )
+        thumbnail = _execute_with_retry(thumbnail)
         if thumbnail.get("contentUrl"):
             urls.append(thumbnail["contentUrl"])
     return urls
