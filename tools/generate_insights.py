@@ -58,15 +58,21 @@ def build_prompt(
     user_overrides: dict,
     media_buyer_notes: str = "",
     special_requests: str = "",
+    currency: str = "USD",
 ) -> str:
+    currency = (currency or "USD").upper()
+    bing = kpis.get("bing", {})
+    bing_funnels = kpis.get("bing_funnels", {})
     return f"""You are a senior performance marketing analyst for prop firms.
 Company: {client}
 Report Month: {month} {year}
 Previous Month: {prev_month} {prev_year or year}
+Currency for all money values: {currency}
 
 === CURRENT MONTH KPIs ===
 Google: Revenue ${kpis['google']['revenue']:,.2f} | Cost ${kpis['google']['cost']:,.2f} | ROAS {kpis['google']['roas']} | Sales {int(kpis['google']['sales'])} | CPS ${kpis['google']['cps']:,.2f} | L2S {kpis['google']['l2s_pct']}% | CVR {kpis['google']['cvr_pct']}% | CTR {kpis['google']['ctr_pct']}%
 Meta:   Revenue ${kpis['meta']['revenue']:,.2f} | Cost ${kpis['meta']['cost']:,.2f} | ROAS {kpis['meta']['roas']} | Sales {int(kpis['meta']['sales'])} | CPS ${kpis['meta']['cps']:,.2f} | L2S {kpis['meta']['l2s_pct']}% | CVR {kpis['meta']['cvr_pct']}% | CTR {kpis['meta']['ctr_pct']}%
+Bing:   Revenue ${bing.get('revenue', 0):,.2f} | Cost ${bing.get('cost', 0):,.2f} | ROAS {bing.get('roas', 0)} | Sales {int(bing.get('sales', 0))} | CPS ${bing.get('cps', 0):,.2f} | L2S {bing.get('l2s_pct', 0)}% | CVR {bing.get('cvr_pct', 0)}% | CTR {bing.get('ctr_pct', 0)}%
 Total:  Revenue ${kpis['totals']['revenue']:,.2f} | Cost ${kpis['totals']['cost']:,.2f} | ROAS {kpis['totals']['roas']}
 
 === FUNNEL BREAKDOWN ===
@@ -76,12 +82,26 @@ Google BOF: {_dumps(kpis['google_funnels'].get('BOF', {}))}
 Meta TOF: {_dumps(kpis['meta_funnels'].get('TOF', {}))}
 Meta MOF: {_dumps(kpis['meta_funnels'].get('MOF', {}))}
 Meta BOF: {_dumps(kpis['meta_funnels'].get('BOF', {}))}
+Bing TOF: {_dumps(bing_funnels.get('TOF', {}))}
+Bing MOF: {_dumps(bing_funnels.get('MOF', {}))}
+Bing BOF: {_dumps(bing_funnels.get('BOF', {}))}
+
+=== TOP FUNNEL ADS BY REVENUE ===
+Google funnel ads: {_dumps(kpis.get('google_funnel_cards', {}), indent=2)}
+Meta funnel ads: {_dumps(kpis.get('meta_funnel_cards', {}), indent=2)}
+Bing funnel ads: {_dumps(kpis.get('bing_funnel_cards', {}), indent=2)}
+
+=== TOTAL FUNNEL DISTRIBUTION ===
+{_dumps(kpis.get('total_funnel_distribution', {}), indent=2)}
 
 === TOP ADS (Google) ===
 {_dumps(kpis['google_top_ads'][:5], indent=2)}
 
 === TOP ADS (Meta) ===
 {_dumps(kpis['meta_top_ads'][:5], indent=2)}
+
+=== TOP ADS (Bing) ===
+{_dumps(kpis.get('bing_top_ads', [])[:5], indent=2)}
 
 === USER OVERRIDES (Slide 4 only) ===
 Company Revenue: ${user_overrides.get('company_revenue', 0):,.2f}
@@ -95,6 +115,12 @@ Ad Cost: ${user_overrides.get('ad_cost', 0):,.2f}
 {special_requests or 'None.'}
 
 Generate the following JSON. Every insight MUST follow DATA → INSIGHT → ACTION framework. Use exact numbers. Never be generic.
+For every *_narrative field, write one complete slide-ready paragraph block with this structure:
+line 1: "1.3M Impressions | 6.1K Clicks | 641.0 Leads | 119 Sales | $7.6K Ad Revenue | $10.9K Ad Spend | $91.7 CPS | 0.7 ROAS"
+line 2: "Distribution: 65.6% ad spend, 22.2% ad revenue, and 27.8% of sales."
+line 3: "Top Performer: [ad/campaign name] reached a [ROAS] ROAS, [sales] sales and [revenue] revenue, which is around [pct]% of funnel stage revenue."
+line 4: "Next Steps: [specific optimization action]."
+Use the requested currency symbol implied by Currency. If a funnel has no sales, write "No data CPS".
 
 {{
   "slide3_general_insights": "...",
@@ -106,6 +132,15 @@ Generate the following JSON. Every insight MUST follow DATA → INSIGHT → ACTI
   "meta_top_performer": "...",
   "meta_main_drop": "...",
   "meta_next_steps": "...",
+  "google_tof_narrative": "...",
+  "google_mof_narrative": "...",
+  "google_bof_narrative": "...",
+  "meta_tof_narrative": "...",
+  "meta_mof_narrative": "...",
+  "meta_bof_narrative": "...",
+  "bing_tof_narrative": "...",
+  "bing_mof_narrative": "...",
+  "bing_bof_narrative": "...",
   "performance_manager_narrative": "...",
   "action_items": ["...", "...", "...", "...", "..."]
 }}"""
@@ -121,6 +156,7 @@ def generate_insights(
     user_overrides: dict,
     media_buyer_notes: str = "",
     special_requests: str = "",
+    currency: str = "USD",
 ) -> dict:
     """Call Anthropic and return parsed JSON dict of slide narratives."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -130,7 +166,7 @@ def generate_insights(
 
     prompt = build_prompt(
         client, month, year, prev_month, prev_year,
-        kpis, user_overrides, media_buyer_notes, special_requests
+        kpis, user_overrides, media_buyer_notes, special_requests, currency
     )
 
     response = client_sdk.messages.create(
@@ -160,6 +196,7 @@ def generate_openai_insights(
     user_overrides: dict,
     media_buyer_notes: str = "",
     special_requests: str = "",
+    currency: str = "USD",
 ) -> dict:
     """Call the OpenAI Responses API and return parsed JSON dict of slide narratives."""
     if OpenAI is None:
@@ -179,6 +216,7 @@ def generate_openai_insights(
         user_overrides,
         media_buyer_notes,
         special_requests,
+        currency,
     )
     instructions = (
         "You are a senior performance marketing analyst specialized in paid media for prop firms. "
@@ -207,6 +245,7 @@ def generate_insights_with_provider(
     user_overrides: dict,
     media_buyer_notes: str = "",
     special_requests: str = "",
+    currency: str = "USD",
     deterministic_factory=None,
 ) -> tuple[dict, str]:
     """Resolve a provider choice and return both insights and the provider actually used."""
@@ -228,6 +267,7 @@ def generate_insights_with_provider(
         "user_overrides": user_overrides,
         "media_buyer_notes": media_buyer_notes,
         "special_requests": special_requests,
+        "currency": currency,
     }
 
     if normalized_provider == "deterministic":

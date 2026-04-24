@@ -1,6 +1,8 @@
 """Shared insight validation and dry-run insight generation."""
 from __future__ import annotations
 
+from tools.report_replacements import build_deterministic_funnel_narratives, fmt_money
+
 REQUIRED_INSIGHT_KEYS = {
     "slide3_general_insights",
     "slide3_budget_roas",
@@ -11,6 +13,15 @@ REQUIRED_INSIGHT_KEYS = {
     "meta_top_performer",
     "meta_main_drop",
     "meta_next_steps",
+    "google_tof_narrative",
+    "google_mof_narrative",
+    "google_bof_narrative",
+    "meta_tof_narrative",
+    "meta_mof_narrative",
+    "meta_bof_narrative",
+    "bing_tof_narrative",
+    "bing_mof_narrative",
+    "bing_bof_narrative",
     "performance_manager_narrative",
     "action_items",
 }
@@ -25,14 +36,22 @@ def assert_insights_shape(insights: dict) -> None:
         raise ValueError("Claude response must include at least 5 action_items.")
 
 
-def build_fake_insights(kpis: dict, client: str, month: str, year: int, next_month: str) -> dict:
+def build_fake_insights(
+    kpis: dict,
+    client: str,
+    month: str,
+    year: int,
+    next_month: str,
+    currency: str = "USD",
+) -> dict:
     """Return deterministic dry-run copy for template and API testing."""
     total = kpis["totals"]
     google = kpis["google"]
     meta = kpis["meta"]
+    deterministic_narratives = build_deterministic_funnel_narratives(kpis, currency)
     return {
         "slide3_general_insights": (
-            f"{client} generated ${total['revenue']:,.2f} from ${total['cost']:,.2f} "
+            f"{client} generated {fmt_money(total['revenue'], currency)} from {fmt_money(total['cost'], currency)} "
             f"in ad spend during {month} {year}, producing {total['roas']} ROAS."
         ),
         "slide3_budget_roas": (
@@ -40,12 +59,13 @@ def build_fake_insights(kpis: dict, client: str, month: str, year: int, next_mon
             "prioritize spend toward the stronger marginal return after reviewing funnel capacity."
         ),
         "slide3_strategy": "Use this dry-run narrative only to validate the Slides replacement pipeline.",
-        "google_top_performer": f"Google revenue was ${google['revenue']:,.2f} on ${google['cost']:,.2f} spend.",
+        "google_top_performer": f"Google revenue was {fmt_money(google['revenue'], currency)} on {fmt_money(google['cost'], currency)} spend.",
         "google_main_drop": "Dry-run insight: review campaigns with low ROAS before scaling.",
         "google_next_steps": "Dry-run action: isolate the best funnel and validate search term quality.",
-        "meta_top_performer": f"Meta revenue was ${meta['revenue']:,.2f} on ${meta['cost']:,.2f} spend.",
+        "meta_top_performer": f"Meta revenue was {fmt_money(meta['revenue'], currency)} on {fmt_money(meta['cost'], currency)} spend.",
         "meta_main_drop": "Dry-run insight: review creative fatigue and audience overlap.",
         "meta_next_steps": "Dry-run action: refresh creative and rebalance budget by funnel.",
+        **deterministic_narratives,
         "performance_manager_narrative": (
             f"Dry-run summary for {client}: validate final language with Claude before client delivery."
         ),

@@ -6,6 +6,7 @@ from tools.calculate_kpis import (
     calculate_funnel_kpis,
     calculate_funnel_top_ads,
     calculate_platform_kpis,
+    calculate_total_funnel_distribution,
     calculate_top_ads,
 )
 
@@ -75,6 +76,37 @@ def test_funnel_top_ads_ignores_zero_revenue_rows():
     assert top["TOF"]["source"] == "Positive Rev"
 
 
+def test_funnel_top_ads_returns_na_for_missing_ad_name():
+    ads = pd.DataFrame(
+        [
+            {"Traffic Source": "meta", "Funnel": "TOF", "Cost": 50, "Total Revenue": 100, "Sales": 1, "Leads": 2, "Click": 5, "Impressions": 50, "Source": ""},
+        ]
+    )
+
+    top = calculate_funnel_top_ads(ads, "meta")
+
+    assert top["TOF"]["source"] == "N/A"
+
+
+def test_total_funnel_distribution_sums_platforms_and_rounds_percentages(sample_campaigns):
+    google = calculate_funnel_kpis(sample_campaigns, "google")
+    meta = calculate_funnel_kpis(sample_campaigns, "meta")
+
+    distribution = calculate_total_funnel_distribution([google, meta])
+
+    assert distribution["TOF"]["cost"] == 180
+    assert distribution["MOF"]["revenue"] == 900
+    assert distribution["BOF"]["cost_pct"] == 13.79
+    assert round(distribution["MOF"]["revenue_pct"]) == 58
+
+
+def test_total_funnel_distribution_handles_zero_totals():
+    distribution = calculate_total_funnel_distribution([{}])
+
+    assert distribution["TOF"]["cost_pct"] == 0
+    assert distribution["MOF"]["revenue_pct"] == 0
+
+
 def test_full_kpi_report_keeps_aggregate_funnels_and_ad_card_rows(sample_campaigns, sample_ads):
     report = build_full_kpi_report(sample_campaigns, sample_ads)
 
@@ -82,3 +114,4 @@ def test_full_kpi_report_keeps_aggregate_funnels_and_ad_card_rows(sample_campaig
     assert report["google_funnel_cards"]["MOF"]["revenue"] == 500
     assert report["meta_funnels"]["TOF"]["revenue"] == 160
     assert report["meta_funnel_cards"]["TOF"]["source"] == "Ad_C - Meta TOF"
+    assert report["total_funnel_distribution"]["TOF"]["cost"] == 180

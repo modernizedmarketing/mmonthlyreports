@@ -7,6 +7,15 @@ import pandas as pd
 def _safe_divide(num: float, den: float, default: float = 0.0) -> float:
     return num / den if den != 0 else default
 
+
+def _clean_source_name(row) -> str:
+    source = row.get("Source", row.get("Source Link", ""))
+    if pd.isna(source) or not str(source).strip():
+        source = row.get("Source Link", "")
+    if pd.isna(source) or not str(source).strip():
+        return "N/A"
+    return str(source).strip()
+
 def calculate_platform_kpis(df: pd.DataFrame, platform: str) -> dict:
     """Calculate aggregate KPIs for a platform (google or meta)."""
     p = df[df["Traffic Source"].str.lower() == platform.lower()]
@@ -71,7 +80,7 @@ def calculate_top_ads(df: pd.DataFrame, platform: str, n: int = 10) -> list:
         revenue = float(row.get("Total Revenue", 0))  # Always use Total Revenue
         sales   = float(row.get("Sales", 0))
         results.append({
-            "source":  str(row.get("Source", row.get("Source Link", "Unknown"))),
+            "source":  _clean_source_name(row),
             "funnel":  str(row.get("Funnel", "")),
             "cost":    round(cost, 2),
             "revenue": round(revenue, 2),
@@ -100,7 +109,7 @@ def calculate_funnel_top_ads(df: pd.DataFrame, platform: str) -> dict:
         clicks = float(row.get("Click", 0))
         impressions = float(row.get("Impressions", 0))
         result[funnel] = {
-            "source": str(row.get("Source", row.get("Source Link", "Unknown"))),
+            "source": _clean_source_name(row),
             "source_link": str(row.get("Source Link", "")),
             "cost": round(cost, 2),
             "revenue": round(revenue, 2),
@@ -116,6 +125,7 @@ def calculate_funnel_top_ads(df: pd.DataFrame, platform: str) -> dict:
     return result
 
 _BING_NAMES = {"bing", "microsoft", "microsoft ads", "bing ads"}
+FUNNEL_STAGES = ("TOF", "MOF", "BOF")
 
 
 def _detect_bing_label(df: pd.DataFrame) -> Optional[str]:
@@ -124,6 +134,22 @@ def _detect_bing_label(df: pd.DataFrame) -> Optional[str]:
         if str(val).strip().lower() in _BING_NAMES:
             return str(val).strip()
     return None
+
+
+def calculate_total_funnel_distribution(platform_funnels: list[dict]) -> dict:
+    """Calculate cross-platform spend/revenue distribution by funnel stage."""
+    result = {}
+    for stage in FUNNEL_STAGES:
+        cost = round(sum(float(funnels.get(stage, {}).get("cost", 0) or 0) for funnels in platform_funnels), 2)
+        revenue = round(sum(float(funnels.get(stage, {}).get("revenue", 0) or 0) for funnels in platform_funnels), 2)
+        result[stage] = {"cost": cost, "revenue": revenue}
+
+    total_cost = sum(stage["cost"] for stage in result.values())
+    total_revenue = sum(stage["revenue"] for stage in result.values())
+    for stage in FUNNEL_STAGES:
+        result[stage]["cost_pct"] = round(_safe_divide(result[stage]["cost"], total_cost) * 100, 2)
+        result[stage]["revenue_pct"] = round(_safe_divide(result[stage]["revenue"], total_revenue) * 100, 2)
+    return result
 
 
 def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> dict:
@@ -146,11 +172,14 @@ def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> d
     total_clicks  = round(sum(p["clicks"]      for p in all_platforms), 0)
     total_impr    = round(sum(p["impressions"] for p in all_platforms), 0)
 
+    google_funnels = calculate_funnel_kpis(campaigns_df, "google")
+    meta_funnels = calculate_funnel_kpis(campaigns_df, "meta")
+
     result = {
         "google":         google,
         "meta":           meta,
-        "google_funnels": calculate_funnel_kpis(campaigns_df, "google"),
-        "meta_funnels":   calculate_funnel_kpis(campaigns_df, "meta"),
+        "google_funnels": google_funnels,
+        "meta_funnels":   meta_funnels,
         "google_funnel_cards": calculate_funnel_top_ads(ads_df, "google"),
         "meta_funnel_cards":   calculate_funnel_top_ads(ads_df, "meta"),
         "google_top_ads": calculate_top_ads(ads_df, "google"),
@@ -176,5 +205,10 @@ def build_full_kpi_report(campaigns_df: pd.DataFrame, ads_df: pd.DataFrame) -> d
         result["bing_funnels"] = calculate_funnel_kpis(campaigns_df, bing_label)
         result["bing_funnel_cards"] = calculate_funnel_top_ads(ads_df, bing_label)
         result["bing_top_ads"] = calculate_top_ads(ads_df, bing_label)
+
+    platform_funnels = [google_funnels, meta_funnels]
+    if result.get("bing_funnels"):
+        platform_funnels.append(result["bing_funnels"])
+    result["total_funnel_distribution"] = calculate_total_funnel_distribution(platform_funnels)
 
     return result

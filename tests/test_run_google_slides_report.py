@@ -19,6 +19,50 @@ def _sample_args(**overrides):
     return argparse.Namespace(**values)
 
 
+def _sample_insights():
+    return {
+        "slide3_general_insights": "a",
+        "slide3_budget_roas": "b",
+        "slide3_strategy": "c",
+        "google_top_performer": "d",
+        "google_main_drop": "e",
+        "google_next_steps": "f",
+        "meta_top_performer": "g",
+        "meta_main_drop": "h",
+        "meta_next_steps": "i",
+        "google_tof_narrative": "google tof",
+        "google_mof_narrative": "google mof",
+        "google_bof_narrative": "google bof",
+        "meta_tof_narrative": "meta tof",
+        "meta_mof_narrative": "meta mof",
+        "meta_bof_narrative": "meta bof",
+        "bing_tof_narrative": "bing tof",
+        "bing_mof_narrative": "bing mof",
+        "bing_bof_narrative": "bing bof",
+        "performance_manager_narrative": "j",
+        "action_items": ["1", "2", "3", "4", "5"],
+    }
+
+
+def _sample_kpis():
+    return {
+        "google": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
+        "meta": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
+        "bing": {"revenue": 0, "cost": 0, "sales": 0, "cps": 0, "roas": 0, "l2s_pct": 0, "cvr_pct": 0, "ctr_pct": 0},
+        "totals": {"revenue": 2, "cost": 2, "sales": 2, "roas": 1, "cps": 1, "l2s_pct": 1, "cvr_pct": 1, "aov": 1},
+        "google_funnels": {},
+        "meta_funnels": {},
+        "bing_funnels": {},
+        "google_funnel_cards": {},
+        "meta_funnel_cards": {},
+        "bing_funnel_cards": {},
+        "google_top_ads": [],
+        "meta_top_ads": [],
+        "bing_top_ads": [],
+        "total_funnel_distribution": {},
+    }
+
+
 def test_validate_runtime_inputs_allows_audit_only_without_spreadsheet():
     runner.validate_runtime_inputs(_sample_args(audit_only=True))
 
@@ -90,34 +134,14 @@ def test_main_raises_when_template_has_missing_values(monkeypatch):
     monkeypatch.setattr(
         runner,
         "build_full_kpi_report",
-        lambda *args, **kwargs: {
-            "google": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "meta": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "totals": {"revenue": 2, "cost": 2, "sales": 2, "roas": 1, "cps": 1, "l2s_pct": 1, "cvr_pct": 1, "aov": 1},
-            "google_funnels": {},
-            "meta_funnels": {},
-            "google_top_ads": [],
-            "meta_top_ads": [],
-        },
+        lambda *args, **kwargs: _sample_kpis(),
     )
     monkeypatch.setattr(runner, "read_manual_inputs", lambda *args, **kwargs: {})
     monkeypatch.setattr(runner, "write_kpi_output", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         runner,
         "generate_insights_with_provider",
-        lambda *args, **kwargs: ({
-            "slide3_general_insights": "a",
-            "slide3_budget_roas": "b",
-            "slide3_strategy": "c",
-            "google_top_performer": "d",
-            "google_main_drop": "e",
-            "google_next_steps": "f",
-            "meta_top_performer": "g",
-            "meta_main_drop": "h",
-            "meta_next_steps": "i",
-            "performance_manager_narrative": "j",
-            "action_items": ["1", "2", "3", "4", "5"],
-        }, "deterministic"),
+        lambda *args, **kwargs: (_sample_insights(), "deterministic"),
     )
     monkeypatch.setattr(runner, "build_slides_replacements", lambda *args, **kwargs: {"{{CLIENT}}": "One Funded"})
     monkeypatch.setattr(runner, "read_placeholders", lambda *args, **kwargs: {"{{CLIENT}}", "{{MISSING}}"})
@@ -149,31 +173,11 @@ def test_run_report_uses_prev_year_for_previous_month(monkeypatch):
     monkeypatch.setattr(
         runner,
         "build_full_kpi_report",
-        lambda *args, **kwargs: {
-            "google": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "meta": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "totals": {"revenue": 2, "cost": 2, "sales": 2, "roas": 1, "cps": 1, "l2s_pct": 1, "cvr_pct": 1, "aov": 1},
-            "google_funnels": {},
-            "meta_funnels": {},
-            "google_top_ads": [],
-            "meta_top_ads": [],
-        },
+        lambda *args, **kwargs: _sample_kpis(),
     )
     monkeypatch.setattr(runner, "read_manual_inputs", lambda *args, **kwargs: {})
     monkeypatch.setattr(runner, "write_kpi_output", lambda *args, **kwargs: None)
-    monkeypatch.setattr(runner, "generate_insights_with_provider", lambda *args, **kwargs: ({
-        "slide3_general_insights": "a",
-        "slide3_budget_roas": "b",
-        "slide3_strategy": "c",
-        "google_top_performer": "d",
-        "google_main_drop": "e",
-        "google_next_steps": "f",
-        "meta_top_performer": "g",
-        "meta_main_drop": "h",
-        "meta_next_steps": "i",
-        "performance_manager_narrative": "j",
-        "action_items": ["1", "2", "3", "4", "5"],
-    }, "deterministic"))
+    monkeypatch.setattr(runner, "generate_insights_with_provider", lambda *args, **kwargs: (_sample_insights(), "deterministic"))
     monkeypatch.setattr(runner, "build_slides_replacements", lambda *args, **kwargs: {"{{CLIENT}}": "One Funded"})
     monkeypatch.setattr(runner, "read_placeholders", lambda *args, **kwargs: {"{{CLIENT}}"})
     monkeypatch.setattr(
@@ -215,31 +219,11 @@ def test_run_report_extracts_output_folder_id_from_url(monkeypatch):
     monkeypatch.setattr(
         runner,
         "build_full_kpi_report",
-        lambda *args, **kwargs: {
-            "google": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "meta": {"revenue": 1, "cost": 1, "sales": 1, "cps": 1, "roas": 1, "l2s_pct": 1, "cvr_pct": 1, "ctr_pct": 1},
-            "totals": {"revenue": 2, "cost": 2, "sales": 2, "roas": 1, "cps": 1, "l2s_pct": 1, "cvr_pct": 1, "aov": 1},
-            "google_funnels": {},
-            "meta_funnels": {},
-            "google_top_ads": [],
-            "meta_top_ads": [],
-        },
+        lambda *args, **kwargs: _sample_kpis(),
     )
     monkeypatch.setattr(runner, "read_manual_inputs", lambda *args, **kwargs: {})
     monkeypatch.setattr(runner, "write_kpi_output", lambda *args, **kwargs: None)
-    monkeypatch.setattr(runner, "generate_insights_with_provider", lambda *args, **kwargs: ({
-        "slide3_general_insights": "a",
-        "slide3_budget_roas": "b",
-        "slide3_strategy": "c",
-        "google_top_performer": "d",
-        "google_main_drop": "e",
-        "google_next_steps": "f",
-        "meta_top_performer": "g",
-        "meta_main_drop": "h",
-        "meta_next_steps": "i",
-        "performance_manager_narrative": "j",
-        "action_items": ["1", "2", "3", "4", "5"],
-    }, "deterministic"))
+    monkeypatch.setattr(runner, "generate_insights_with_provider", lambda *args, **kwargs: (_sample_insights(), "deterministic"))
     monkeypatch.setattr(runner, "build_slides_replacements", lambda *args, **kwargs: {"{{CLIENT}}": "One Funded"})
     monkeypatch.setattr(runner, "read_placeholders", lambda *args, **kwargs: {"{{CLIENT}}"})
     monkeypatch.setattr(

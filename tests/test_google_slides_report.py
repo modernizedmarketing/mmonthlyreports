@@ -143,13 +143,18 @@ def test_build_slides_replacements_contains_required_template_tokens():
         "meta_funnels": {"MOF": {"revenue": 200, "cost": 100, "sales": 2, "cps": 50, "roas": 2, "cvr_pct": 2}},
         "bing_funnels": {"BOF": {"revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}},
         "google_funnel_cards": {
-            "TOF": {"revenue": 1044.40, "cost": 53.99, "sales": 3, "cps": 18, "roas": 19.34, "cvr_pct": 27.27}
+            "TOF": {"source": "Google TOF Winner", "revenue": 1044.40, "cost": 53.99, "sales": 3, "cps": 18, "roas": 19.34, "cvr_pct": 27.27}
         },
         "meta_funnel_cards": {
-            "MOF": {"revenue": 390.45, "cost": 44.25, "sales": 7, "cps": 6.32, "roas": 8.82, "cvr_pct": 3.43}
+            "MOF": {"source": "Meta MOF Winner", "revenue": 390.45, "cost": 44.25, "sales": 7, "cps": 6.32, "roas": 8.82, "cvr_pct": 3.43}
         },
         "bing_funnel_cards": {
-            "BOF": {"revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}
+            "BOF": {"source": "Bing BOF Winner", "revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}
+        },
+        "total_funnel_distribution": {
+            "TOF": {"cost": 50, "cost_pct": 16.67, "revenue": 100, "revenue_pct": 16.67},
+            "MOF": {"cost": 100, "cost_pct": 33.33, "revenue": 200, "revenue_pct": 33.33},
+            "BOF": {"cost": 150, "cost_pct": 50, "revenue": 300, "revenue_pct": 50},
         },
         "totals": {
             "revenue": 2100,
@@ -202,6 +207,25 @@ def test_build_slides_replacements_contains_required_template_tokens():
     assert replacements["{{META_MOF_CR}}"] == "3.4%"
     assert replacements["{{META_BOF_REVENUE}}"] == "N/A"
     assert replacements["{{BING_BOF_ROAS}}"] == "2.0"
+    assert replacements["{{TOTAL_TOF_COST}}"] == "$50"
+    assert replacements["{{TOTAL_BOF_REVENUE_PCT}}"] == "50%"
+    assert replacements["{{GOOGLE_TOF_AD_NAME}}"] == "Google TOF Winner"
+    assert replacements["{{META_MOF_AD_NAME}}"] == "Meta MOF Winner"
+    assert replacements["{{BING_BOF_AD_NAME}}"] == "Bing BOF Winner"
+    assert "Impressions |" in replacements["{{GOOGLE_TOF_NARRATIVE}}"]
+
+    eur_replacements = build_slides_replacements(
+        "One Funded",
+        "March",
+        2026,
+        "February",
+        "April",
+        kpis,
+        insights,
+        {"company_revenue": 3000, "currency": "EUR"},
+    )
+    assert eur_replacements["{{GOOGLE_TOF_REVENUE}}"] == "€1K"
+    assert eur_replacements["{{SLIDE4_AD_COST}}"].startswith("€")
 
 
 def test_build_audit_replacements_contains_dynamic_template_tokens():
@@ -224,6 +248,15 @@ def test_build_audit_replacements_contains_dynamic_template_tokens():
         "{{GOOGLE_ROAS_PREV}}",
         "{{META_CPS_PREV}}",
         "{{BING_CVR_PREV}}",
+        "{{GOOGLE_TOF_NARRATIVE}}",
+        "{{META_MOF_NARRATIVE}}",
+        "{{BING_BOF_NARRATIVE}}",
+        "{{TOTAL_TOF_COST}}",
+        "{{TOTAL_MOF_COST_PCT}}",
+        "{{TOTAL_BOF_REVENUE}}",
+        "{{GOOGLE_TOF_AD_NAME}}",
+        "{{META_MOF_AD_NAME}}",
+        "{{BING_BOF_AD_NAME}}",
     }
 
     assert expected_tokens <= set(replacements)

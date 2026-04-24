@@ -65,6 +65,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prev-company-revenue", type=float, default=None)
     parser.add_argument("--prev-ad-revenue", type=float, default=None)
     parser.add_argument("--prev-ad-cost", type=float, default=None)
+    parser.add_argument(
+        "--currency",
+        choices=["USD", "EUR", "usd", "eur"],
+        default=os.environ.get("REPORT_CURRENCY", "USD"),
+        help="Currency symbol used for placeholder-backed money values and generated narratives.",
+    )
     parser.add_argument("--media-buyer-notes", default="")
     parser.add_argument("--special-requests", default="")
     parser.add_argument(
@@ -108,6 +114,7 @@ def build_run_namespace(**overrides) -> argparse.Namespace:
         "prev_company_revenue": None,
         "prev_ad_revenue": None,
         "prev_ad_cost": None,
+        "currency": os.environ.get("REPORT_CURRENCY", "USD"),
         "media_buyer_notes": "",
         "special_requests": "",
         "insights_provider": os.environ.get("REPORT_INSIGHTS_PROVIDER", "deterministic"),
@@ -140,6 +147,12 @@ def _manual_or_arg(
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _resolve_currency(manual: dict, args: argparse.Namespace) -> str:
+    value = getattr(args, "currency", None) or manual.get("currency") or manual.get("Currency") or "USD"
+    normalized = str(value).strip().upper()
+    return normalized if normalized in {"USD", "EUR"} else "USD"
 
 
 def ensure_supported_python_version() -> None:
@@ -290,6 +303,8 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
             manual_key="ad_cost",
         ),
     }
+    currency = _resolve_currency(manual_inputs, args)
+    overrides["currency"] = currency
 
     if not args.skip_kpi_output:
         write_kpi_output(services["sheets"], spreadsheet_id, kpis, sheet_name=args.kpi_output_sheet)
@@ -305,12 +320,14 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         user_overrides=overrides,
         media_buyer_notes=args.media_buyer_notes or str(manual_inputs.get("media_buyer_notes", "")),
         special_requests=args.special_requests or str(manual_inputs.get("special_requests", "")),
+        currency=currency,
         deterministic_factory=lambda: build_fake_insights(
             kpis,
             args.client,
             window.month,
             window.year,
             window.next_month,
+            currency,
         ),
     )
     assert_insights_shape(insights)
@@ -402,6 +419,7 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         "requested_insights_provider": requested_provider,
         "used_insights_provider": used_provider,
         "insights_mode": insights_mode,
+        "currency": currency,
         "template_audit": audit,
         "pdf_path": pdf_path,
         "pptx_path": pptx_path,

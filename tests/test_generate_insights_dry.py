@@ -13,10 +13,18 @@ SAMPLE_KPIS = {
                "impressions": 50000, "roas": 2.5, "cps": 80.0, "l2s_pct": 25.0, "cvr_pct": 5.0, "ctr_pct": 2.0, "aov": 200.0},
     "meta":   {"revenue": 5000,  "cost": 3000, "sales": 25, "leads": 100, "clicks": 500,
                "impressions": 25000, "roas": 1.67, "cps": 120.0, "l2s_pct": 25.0, "cvr_pct": 5.0, "ctr_pct": 2.0, "aov": 200.0},
-    "google_funnels": {"TOF": {"cost": 1000, "revenue": 2000, "sales": 10, "leads": 50, "roas": 2.0, "cps": 100.0, "l2s_pct": 20.0, "cvr_pct": 4.0}},
-    "meta_funnels": {"MOF": {"cost": 3000, "revenue": 5000, "sales": 25, "leads": 100, "roas": 1.67, "cps": 120.0, "l2s_pct": 25.0, "cvr_pct": 5.0}},
+    "bing":   {"revenue": 1200,  "cost": 600, "sales": 6, "leads": 40, "clicks": 250,
+               "impressions": 12000, "roas": 2.0, "cps": 100.0, "l2s_pct": 15.0, "cvr_pct": 2.4, "ctr_pct": 2.08, "aov": 200.0},
+    "google_funnels": {"TOF": {"cost": 1000, "revenue": 2000, "sales": 10, "leads": 50, "clicks": 250, "impressions": 10000, "roas": 2.0, "cps": 100.0, "l2s_pct": 20.0, "cvr_pct": 4.0}},
+    "meta_funnels": {"MOF": {"cost": 3000, "revenue": 5000, "sales": 25, "leads": 100, "clicks": 500, "impressions": 25000, "roas": 1.67, "cps": 120.0, "l2s_pct": 25.0, "cvr_pct": 5.0}},
+    "bing_funnels": {"BOF": {"cost": 600, "revenue": 1200, "sales": 6, "leads": 40, "clicks": 250, "impressions": 12000, "roas": 2.0, "cps": 100.0, "l2s_pct": 15.0, "cvr_pct": 2.4}},
+    "google_funnel_cards": {"TOF": {"source": "TOF Search", "cost": 1000, "revenue": 2000, "sales": 10, "roas": 2.0}},
+    "meta_funnel_cards": {"MOF": {"source": "MOF Retargeting", "cost": 3000, "revenue": 5000, "sales": 25, "roas": 1.67}},
+    "bing_funnel_cards": {"BOF": {"source": "BOF Bing", "cost": 600, "revenue": 1200, "sales": 6, "roas": 2.0}},
     "google_top_ads": [{"source": "Branded Search", "funnel": "MOF", "cost": 1000, "revenue": 3000, "sales": 15, "roas": 3.0}],
     "meta_top_ads": [],
+    "bing_top_ads": [],
+    "total_funnel_distribution": {"TOF": {"cost": 1000, "cost_pct": 21.74, "revenue": 2000, "revenue_pct": 24.39}},
     "totals": {"cost": 7000, "revenue": 15000, "sales": 75, "roas": 2.14},
 }
 
@@ -25,6 +33,8 @@ def test_build_prompt_contains_client_name():
     assert "Funded Profit" in prompt
     assert "March" in prompt
     assert "February" in prompt
+    assert "google_tof_narrative" in prompt
+    assert "Currency for all money values" in prompt
 
 def test_generate_insights_returns_dict(monkeypatch):
     mock_response = MagicMock()

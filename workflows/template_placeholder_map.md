@@ -122,11 +122,11 @@ Top KPI row:
 
 Funnel narrative text boxes:
 
-- TOF paragraph beginning `1.3M Impressions | 6.1K Clicks...` -> `{{GOOGLE_TOF_NARRATIVE}}` only after we add this token in code.
-- MOF paragraph beginning `228.0K Impressions | 7.1K Clicks...` -> `{{GOOGLE_MOF_NARRATIVE}}` only after we add this token in code.
-- BOF paragraph beginning `3.6K Impressions | 61.0 Clicks...` -> `{{GOOGLE_BOF_NARRATIVE}}` only after we add this token in code.
+- TOF paragraph beginning `1.3M Impressions | 6.1K Clicks...` -> `{{GOOGLE_TOF_NARRATIVE}}`
+- MOF paragraph beginning `228.0K Impressions | 7.1K Clicks...` -> `{{GOOGLE_MOF_NARRATIVE}}`
+- BOF paragraph beginning `3.6K Impressions | 61.0 Clicks...` -> `{{GOOGLE_BOF_NARRATIVE}}`
 
-For the first audit, either leave the funnel narrative paragraphs manual or delete them from the template. Do **not** add the narrative tokens above until code supports them.
+These are now code-supported. Final report runs should use the LLM provider for polished copy; audit/deterministic runs use metric-based fallback text so the template can still pass without API access.
 
 ## Slide 9 - Google Funnel Metric Cards
 
@@ -206,11 +206,11 @@ Top KPI row:
 
 Funnel narrative text boxes:
 
-- TOF paragraph beginning `2.1M Impressions | 15.1K Clicks...` -> leave manual for now.
-- MOF paragraph beginning `94.6K Impressions | 653.0 Clicks...` -> leave manual for now.
-- BOF paragraph beginning `40.8K Impressions | 548.0 Clicks...` -> leave manual for now.
+- TOF paragraph beginning `2.1M Impressions | 15.1K Clicks...` -> `{{META_TOF_NARRATIVE}}`
+- MOF paragraph beginning `94.6K Impressions | 653.0 Clicks...` -> `{{META_MOF_NARRATIVE}}`
+- BOF paragraph beginning `40.8K Impressions | 548.0 Clicks...` -> `{{META_BOF_NARRATIVE}}`
 
-We can add generated `META_*_NARRATIVE` tokens later if you want these paragraphs automated.
+Do not add CTR, CPL, or CPC cards on this slide. The supported KPI cards here are Lead to Sale Ratio and Conv. Rate.
 
 ## Slide 15 - Meta TOF/MOF Funnel Metric Cards
 
@@ -291,10 +291,10 @@ Top KPI row:
 
 Funnel narrative text boxes:
 
-- TOF paragraph beginning `159.8K Impressions | 2.0K Clicks...` -> leave manual for now.
-- MOF paragraph beginning `1.3K Impressions | 428.0 Clicks...` -> leave manual for now.
+- TOF paragraph beginning `159.8K Impressions | 2.0K Clicks...` -> `{{BING_TOF_NARRATIVE}}`
+- MOF paragraph beginning `1.3K Impressions | 428.0 Clicks...` -> `{{BING_MOF_NARRATIVE}}`
 
-We can add generated `BING_*_NARRATIVE` tokens later if needed.
+`{{BING_BOF_NARRATIVE}}` is code-supported for future use, but the current master deck only has TOF and MOF narrative boxes on this Bing slide.
 
 ## Slide 22 - Bing Funnel Metric Cards
 
@@ -331,9 +331,24 @@ Automate later with linked Google Sheets charts.
 
 ## Slide 24 - Total Ads Performance
 
-Manual/static for now.
+Manual/static for now unless it is the funnel distribution visual in the Full Services master deck.
 
-Likely chart/image slide. Automate later with linked Google Sheets charts.
+For the Full Services funnel distribution slide, use:
+
+- TOF ad spend value -> `{{TOTAL_TOF_COST}}`
+- TOF ad spend share -> `{{TOTAL_TOF_COST_PCT}}`
+- MOF ad spend value -> `{{TOTAL_MOF_COST}}`
+- MOF ad spend share -> `{{TOTAL_MOF_COST_PCT}}`
+- BOF ad spend value -> `{{TOTAL_BOF_COST}}`
+- BOF ad spend share -> `{{TOTAL_BOF_COST_PCT}}`
+- TOF ad revenue value -> `{{TOTAL_TOF_REVENUE}}`
+- TOF ad revenue share -> `{{TOTAL_TOF_REVENUE_PCT}}`
+- MOF ad revenue value -> `{{TOTAL_MOF_REVENUE}}`
+- MOF ad revenue share -> `{{TOTAL_MOF_REVENUE_PCT}}`
+- BOF ad revenue value -> `{{TOTAL_BOF_REVENUE}}`
+- BOF ad revenue share -> `{{TOTAL_BOF_REVENUE_PCT}}`
+
+Values come from Campaigns across Google, Meta, and Bing/Microsoft by funnel stage. Money uses compact report currency formatting (`$28K` or `€28K`) and percentages are whole numbers.
 
 ## Slide 25 - Total Ads Results Monthly Comparison
 
