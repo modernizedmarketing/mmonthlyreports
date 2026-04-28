@@ -214,10 +214,23 @@ def _distribution_replacements(distribution: dict[str, Any], currency: str | Non
     return replacements
 
 
+def format_ad_name_with_source_link(card: dict[str, Any] | None) -> str:
+    card = card or {}
+    source = str(card.get("source") or "").strip()
+    source_link = str(card.get("source_link") or "").strip()
+    if not source and not source_link:
+        return "N/A"
+    if not source or source == "N/A":
+        return source_link
+    if source_link and source_link.lower() != source.lower():
+        return f"{source} | Source Link: {source_link}"
+    return source
+
+
 def _ad_name_replacements(prefix: str, cards: dict[str, Any]) -> dict[str, str]:
     token = prefix.upper()
     return {
-        f"{{{{{token}_{stage}_AD_NAME}}}}": str(cards.get(stage, {}).get("source") or "N/A")
+        f"{{{{{token}_{stage}_AD_NAME}}}}": format_ad_name_with_source_link(cards.get(stage, {}))
         for stage in FUNNEL_STAGES
     }
 

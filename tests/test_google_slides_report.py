@@ -143,13 +143,13 @@ def test_build_slides_replacements_contains_required_template_tokens():
         "meta_funnels": {"MOF": {"revenue": 200, "cost": 100, "sales": 2, "cps": 50, "roas": 2, "cvr_pct": 2}},
         "bing_funnels": {"BOF": {"revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}},
         "google_funnel_cards": {
-            "TOF": {"source": "Google TOF Winner", "revenue": 1044.40, "cost": 53.99, "sales": 3, "cps": 18, "roas": 19.34, "cvr_pct": 27.27}
+            "TOF": {"source": "Google TOF Winner", "source_link": "TOF - Branded - Exact - US", "revenue": 1044.40, "cost": 53.99, "sales": 3, "cps": 18, "roas": 19.34, "cvr_pct": 27.27}
         },
         "meta_funnel_cards": {
-            "MOF": {"source": "Meta MOF Winner", "revenue": 390.45, "cost": 44.25, "sales": 7, "cps": 6.32, "roas": 8.82, "cvr_pct": 3.43}
+            "MOF": {"source": "Meta MOF Winner", "source_link": "MOF - Website Visitors", "revenue": 390.45, "cost": 44.25, "sales": 7, "cps": 6.32, "roas": 8.82, "cvr_pct": 3.43}
         },
         "bing_funnel_cards": {
-            "BOF": {"source": "Bing BOF Winner", "revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}
+            "BOF": {"source": "Bing BOF Winner", "source_link": "BOF - Branded - Bing", "revenue": 300, "cost": 150, "sales": 3, "cps": 50, "roas": 2, "cvr_pct": 3}
         },
         "total_funnel_distribution": {
             "TOF": {"cost": 50, "cost_pct": 16.67, "revenue": 100, "revenue_pct": 16.67},
@@ -210,9 +210,9 @@ def test_build_slides_replacements_contains_required_template_tokens():
     assert replacements["{{BING_BOF_ROAS}}"] == "2.0"
     assert replacements["{{TOTAL_TOF_COST}}"] == "$50"
     assert replacements["{{TOTAL_BOF_REVENUE_PCT}}"] == "50%"
-    assert replacements["{{GOOGLE_TOF_AD_NAME}}"] == "Google TOF Winner"
-    assert replacements["{{META_MOF_AD_NAME}}"] == "Meta MOF Winner"
-    assert replacements["{{BING_BOF_AD_NAME}}"] == "Bing BOF Winner"
+    assert replacements["{{GOOGLE_TOF_AD_NAME}}"] == "Google TOF Winner | Source Link: TOF - Branded - Exact - US"
+    assert replacements["{{META_MOF_AD_NAME}}"] == "Meta MOF Winner | Source Link: MOF - Website Visitors"
+    assert replacements["{{BING_BOF_AD_NAME}}"] == "Bing BOF Winner | Source Link: BOF - Branded - Bing"
     assert "Impressions |" in replacements["{{GOOGLE_TOF_NARRATIVE}}"]
 
     eur_replacements = build_slides_replacements(
@@ -263,6 +263,30 @@ def test_build_audit_replacements_contains_dynamic_template_tokens():
     assert expected_tokens <= set(replacements)
     assert replacements["{{REPORT_MONTH}}"] == "March 2026"
     assert replacements["{{CLIENT}}"] == "One Funded"
+
+
+def test_ad_name_placeholder_uses_source_link_when_ad_name_is_missing():
+    replacements = build_slides_replacements(
+        "One Funded",
+        "March",
+        2026,
+        "February",
+        "April",
+        {
+            "google": {},
+            "meta": {},
+            "google_funnels": {},
+            "meta_funnels": {},
+            "google_funnel_cards": {"TOF": {"source": "N/A", "source_link": "TOF - Campaign Name"}},
+            "meta_funnel_cards": {},
+            "total_funnel_distribution": {},
+            "totals": {"revenue": 0, "cost": 0, "sales": 0, "roas": 0, "cps": 0, "l2s_pct": 0, "cvr_pct": 0, "aov": 0},
+        },
+        {},
+        {},
+    )
+
+    assert replacements["{{GOOGLE_TOF_AD_NAME}}"] == "TOF - Campaign Name"
 
 
 def test_build_slides_replacements_uses_previous_kpis_and_overrides():

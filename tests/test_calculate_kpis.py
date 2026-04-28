@@ -53,6 +53,30 @@ def test_top_ads_sorted_by_total_revenue(sample_ads):
     assert len(top) == 2
 
 
+def test_top_ads_include_source_link_for_ai_context():
+    ads = pd.DataFrame(
+        [
+            {
+                "Traffic Source": "google",
+                "Funnel": "TOF",
+                "Cost": 10,
+                "Total Revenue": 100,
+                "Sales": 1,
+                "Leads": 2,
+                "Click": 10,
+                "Impressions": 100,
+                "Source": "Ad 123456",
+                "Source Link": "TOF - Branded - Exact - US",
+            },
+        ]
+    )
+
+    top = calculate_top_ads(ads, "google", n=1)
+
+    assert top[0]["source"] == "Ad 123456"
+    assert top[0]["source_link"] == "TOF - Branded - Exact - US"
+
+
 def test_funnel_top_ads_selects_highest_revenue_ad_by_stage(sample_ads):
     top = calculate_funnel_top_ads(sample_ads, "google")
 

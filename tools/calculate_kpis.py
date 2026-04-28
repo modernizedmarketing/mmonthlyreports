@@ -16,6 +16,13 @@ def _clean_source_name(row) -> str:
         return "N/A"
     return str(source).strip()
 
+
+def _clean_source_link(row) -> str:
+    source_link = row.get("Source Link", "")
+    if pd.isna(source_link) or not str(source_link).strip():
+        return ""
+    return str(source_link).strip()
+
 def calculate_platform_kpis(df: pd.DataFrame, platform: str) -> dict:
     """Calculate aggregate KPIs for a platform (google or meta)."""
     p = df[df["Traffic Source"].str.lower() == platform.lower()]
@@ -81,6 +88,7 @@ def calculate_top_ads(df: pd.DataFrame, platform: str, n: int = 10) -> list:
         sales   = float(row.get("Sales", 0))
         results.append({
             "source":  _clean_source_name(row),
+            "source_link": _clean_source_link(row),
             "funnel":  str(row.get("Funnel", "")),
             "cost":    round(cost, 2),
             "revenue": round(revenue, 2),
@@ -110,7 +118,7 @@ def calculate_funnel_top_ads(df: pd.DataFrame, platform: str) -> dict:
         impressions = float(row.get("Impressions", 0))
         result[funnel] = {
             "source": _clean_source_name(row),
-            "source_link": str(row.get("Source Link", "")),
+            "source_link": _clean_source_link(row),
             "cost": round(cost, 2),
             "revenue": round(revenue, 2),
             "sales": round(sales, 0),
