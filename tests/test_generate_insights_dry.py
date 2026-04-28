@@ -6,6 +6,7 @@ from tools.generate_insights import (
     generate_insights,
     generate_insights_with_provider,
     generate_openai_insights,
+    InsightProviderError,
 )
 
 SAMPLE_KPIS = {
@@ -50,9 +51,31 @@ def test_generate_insights_returns_dict(monkeypatch):
     assert "action_items" in result
 
 
-def test_generate_insights_with_provider_falls_back_to_deterministic(monkeypatch):
+def test_generate_insights_with_provider_auto_requires_ai_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(InsightProviderError, match="requires ANTHROPIC_API_KEY or OPENAI_API_KEY"):
+        generate_insights_with_provider(
+            "auto",
+            client="Funded Profit",
+            month="March",
+            year=2026,
+            prev_month="February",
+            prev_year=2026,
+            kpis=SAMPLE_KPIS,
+            user_overrides={},
+            deterministic_factory=lambda: {"slide3_general_insights": "deterministic"},
+        )
+
+
+def test_generate_insights_with_provider_auto_uses_anthropic(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "tools.generate_insights.generate_insights",
+        lambda **_kwargs: {"slide3_general_insights": "anthropic"},
+    )
 
     result, provider = generate_insights_with_provider(
         "auto",
@@ -63,11 +86,33 @@ def test_generate_insights_with_provider_falls_back_to_deterministic(monkeypatch
         prev_year=2026,
         kpis=SAMPLE_KPIS,
         user_overrides={},
-        deterministic_factory=lambda: {"slide3_general_insights": "deterministic", "action_items": ["1", "2", "3", "4", "5"]},
     )
 
-    assert provider == "deterministic"
-    assert result["slide3_general_insights"] == "deterministic"
+    assert provider == "anthropic"
+    assert result["slide3_general_insights"] == "anthropic"
+
+
+def test_generate_insights_with_provider_auto_uses_openai_when_anthropic_missing(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "tools.generate_insights.generate_openai_insights",
+        lambda **_kwargs: {"slide3_general_insights": "openai"},
+    )
+
+    result, provider = generate_insights_with_provider(
+        "auto",
+        client="Funded Profit",
+        month="March",
+        year=2026,
+        prev_month="February",
+        prev_year=2026,
+        kpis=SAMPLE_KPIS,
+        user_overrides={},
+    )
+
+    assert provider == "openai"
+    assert result["slide3_general_insights"] == "openai"
 
 
 def test_generate_openai_insights_returns_dict(monkeypatch):

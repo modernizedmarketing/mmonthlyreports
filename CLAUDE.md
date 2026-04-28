@@ -73,8 +73,8 @@ For production and Cloud Run:
 - Use Python `3.11+`.
 - Prefer a Google service account via `GOOGLE_SERVICE_ACCOUNT_FILE`.
 - Share the source Sheet, Slides template, and Drive output folder with that service account.
-- Set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` only if you want AI-generated narrative copy.
-- Default monthly automation should use deterministic insights so runs never block on credits.
+- Set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` for test and production report runs; `auto` requires one of them.
+- Default monthly automation should use `auto` insights so test and production reports use AI-generated narratives.
 - Set `MASTER_CONTROL_SHEET_ID` for the 14-client orchestration flow.
 - Set `CLOUD_RUN_PROJECT`, `CLOUD_RUN_REGION`, and `CLOUD_RUN_JOB_NAME` for the manual control panel service.
 
@@ -123,7 +123,7 @@ python3 tools/run_control_sheet_reports.py \
   --control-sheet "MASTER_CONTROL_SHEET_URL_OR_ID" \
   --run-mode all \
   --month March --year 2026 \
-  --insights-provider deterministic
+  --insights-provider auto
 ```
 
 ## Verification

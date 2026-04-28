@@ -95,7 +95,7 @@ def main() -> int:
     summaries: list[dict] = []
     failures: list[dict] = []
     for client in selected_clients:
-        requested_provider = (args.insights_provider or client.insights_provider or "deterministic").strip().lower()
+        requested_provider = (args.insights_provider or client.insights_provider or "auto").strip().lower()
         client_args = build_run_namespace(
             spreadsheet=client.spreadsheet_id,
             template_presentation=client.template_presentation_id,

@@ -62,6 +62,21 @@ def test_funnel_top_ads_selects_highest_revenue_ad_by_stage(sample_ads):
     assert top["BOF"] == {}
 
 
+def test_funnel_top_ads_prefers_revenue_over_sales():
+    ads = pd.DataFrame(
+        [
+            {"Traffic Source": "meta", "Funnel": "TOF", "Cost": 240, "Total Revenue": 415.46, "Sales": 2, "Leads": 11, "Click": 3473, "Impressions": 139914, "Source": "Higher Revenue"},
+            {"Traffic Source": "meta", "Funnel": "TOF", "Cost": 90, "Total Revenue": 189.01, "Sales": 3, "Leads": 7, "Click": 23, "Impressions": 3394, "Source": "More Sales"},
+        ]
+    )
+
+    top = calculate_funnel_top_ads(ads, "meta")
+
+    assert top["TOF"]["source"] == "Higher Revenue"
+    assert top["TOF"]["revenue"] == 415.46
+    assert top["TOF"]["sales"] == 2
+
+
 def test_funnel_top_ads_ignores_zero_revenue_rows():
     ads = pd.DataFrame(
         [

@@ -196,7 +196,8 @@ def test_build_slides_replacements_contains_required_template_tokens():
     assert replacements["{{REPORT_MONTH}}"] == "March 2026"
     assert replacements["{{CLIENT}}"] == "One Funded"
     assert replacements["{{ACTION_ITEM_5}}"] == "A5"
-    assert replacements["{{PCT_REV_FROM_ADS}}"] == "70%"
+    assert replacements["{{COMPANY_REVENUE}}"] == "$0.00"
+    assert replacements["{{PCT_REV_FROM_ADS}}"] == "0%"
     assert replacements["{{GOOGLE_TOF_REVENUE}}"] == "$1K"
     assert replacements["{{GOOGLE_TOF_ROAS}}"] == "19"
     assert replacements["{{GOOGLE_TOF_CPS}}"] == "$18"
@@ -326,8 +327,8 @@ def test_build_slides_replacements_uses_previous_kpis_and_overrides():
         prev_kpis=prev_kpis,
     )
 
-    assert replacements["{{COMPANY_REVENUE_PREV}}"] == "$4,000.00"
-    assert replacements["{{PCT_REV_FROM_ADS_PREV}}"] == "50%"
+    assert replacements["{{COMPANY_REVENUE_PREV}}"] == "$0.00"
+    assert replacements["{{PCT_REV_FROM_ADS_PREV}}"] == "0%"
     assert replacements["{{SLIDE4_AD_REVENUE_PREV}}"] == "$2,000.00"
     assert replacements["{{SLIDE4_AD_COST_PREV}}"] == "$1,000.00"
     assert replacements["{{SLIDE4_ROAS_PREV}}"] == "2.00"

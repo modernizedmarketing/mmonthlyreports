@@ -22,6 +22,8 @@ Tabs created:
 - `timezone`
 - `insights_provider`
 
+Use `auto` for active clients so real runs use Anthropic/OpenAI narratives and fail clearly if no AI key is configured. Use `deterministic` only for explicit technical dry runs.
+
 `Runs` headers:
 
 - `timestamp_utc`

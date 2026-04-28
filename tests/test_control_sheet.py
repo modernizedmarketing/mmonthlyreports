@@ -22,7 +22,7 @@ def test_load_control_sheet_clients_parses_active_rows(monkeypatch):
     assert len(clients) == 1
     assert clients[0].client_key == "one-funded"
     assert clients[0].campaigns_tab == "Campaigns"
-    assert clients[0].insights_provider == "deterministic"
+    assert clients[0].insights_provider == "auto"
 
 
 def test_load_control_sheet_clients_requires_columns(monkeypatch):

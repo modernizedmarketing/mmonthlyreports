@@ -14,6 +14,7 @@ def _sample_args(**overrides):
         year=2026,
         prev_month="February",
         next_month="April",
+        insights_provider="deterministic",
     ).__dict__
     values.update(overrides)
     return argparse.Namespace(**values)
@@ -86,6 +87,18 @@ def test_validate_runtime_inputs_requires_openai_key(monkeypatch):
         runner.validate_runtime_inputs(_sample_args(insights_provider="openai", spreadsheet="sheet-id"))
 
 
+def test_validate_runtime_inputs_requires_ai_key_for_auto(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(EnvironmentError, match="INSIGHTS_PROVIDER=auto requires"):
+        runner.validate_runtime_inputs(_sample_args(insights_provider="auto", spreadsheet="sheet-id"))
+
+
+def test_build_run_namespace_defaults_to_auto_provider():
+    assert runner.build_run_namespace().insights_provider == "auto"
+
+
 def test_resolve_requested_provider_promotes_use_claude_alias():
     assert runner.resolve_requested_provider(_sample_args(use_claude=True)) == "anthropic"
 
@@ -95,6 +108,14 @@ def test_ensure_supported_python_version_rejects_old_python(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Python 3.11\\+ is required"):
         runner.ensure_supported_python_version()
+
+
+def test_ensure_report_data_available_raises_clear_error_for_empty_period():
+    class EmptyFrame:
+        empty = True
+
+    with pytest.raises(ValueError, match="No report data found in 'Campaigns'.*April 2026"):
+        runner.ensure_report_data_available(EmptyFrame(), "Campaigns", "Top Tier Trader", "April", 2026)
 
 
 def test_main_audit_only_prints_summary(monkeypatch, capsys):

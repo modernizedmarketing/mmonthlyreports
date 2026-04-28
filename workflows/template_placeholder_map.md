@@ -126,7 +126,7 @@ Funnel narrative text boxes:
 - MOF paragraph beginning `228.0K Impressions | 7.1K Clicks...` -> `{{GOOGLE_MOF_NARRATIVE}}`
 - BOF paragraph beginning `3.6K Impressions | 61.0 Clicks...` -> `{{GOOGLE_BOF_NARRATIVE}}`
 
-These are now code-supported. Final report runs should use the LLM provider for polished copy; audit/deterministic runs use metric-based fallback text so the template can still pass without API access.
+These are now code-supported. Final report runs should use `auto` for AI-polished copy. Deterministic copy is only for explicit technical dry runs and should not be used for real technician/client validation.
 
 ## Slide 9 - Google Funnel Metric Cards
 

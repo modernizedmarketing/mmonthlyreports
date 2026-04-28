@@ -20,8 +20,9 @@ This workflow now supports both:
 - Use Python `3.11+`.
 - For Cloud Run, mount a service-account JSON and set `GOOGLE_SERVICE_ACCOUNT_FILE`.
 - For local development, leave `GOOGLE_SERVICE_ACCOUNT_FILE` unset and rely on `credentials.json` plus cached OAuth tokens.
-- `REPORT_INSIGHTS_PROVIDER` defaults to `deterministic` for no-credit-risk runs.
-- `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are optional unless you explicitly request those providers.
+- `REPORT_INSIGHTS_PROVIDER` defaults to `auto` for real runs.
+- `auto` tries Anthropic first, then OpenAI, and fails if neither API key is configured.
+- `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is required for test/production narrative generation.
 - Set `GOOGLE_DRIVE_OUTPUT_FOLDER_ID` when the destination folder should come from environment defaults.
 - Set `MASTER_CONTROL_SHEET_ID` for the multi-client batch runner.
 - Set `CLOUD_RUN_PROJECT`, `CLOUD_RUN_REGION`, and `CLOUD_RUN_JOB_NAME` for the operator control panel.
@@ -43,6 +44,7 @@ Use one separate control sheet for orchestration across the 14 clients.
 - `Clients` tab:
   - Required columns: `active`, `client_name`, `client_key`, `spreadsheet_url_or_id`, `template_presentation_url_or_id`, `output_folder_id`
   - Optional columns: `campaigns_tab`, `ads_tab`, `timezone`, `insights_provider`
+  - Use `insights_provider = auto` for active clients unless you are intentionally running a technical deterministic audit.
 - `Runs` tab:
   - Centralized log for one row per client execution with provider used, deck URL, and error summary.
 
@@ -56,7 +58,9 @@ The batch runner defaults to centralized logging only, so client sheets can stay
 - Platform summary and total results use aggregate rows from the `Campaigns` tab.
 - Funnel card placeholders such as `{{GOOGLE_TOF_REVENUE}}` use the highest-`Total Revenue` ad row for that platform/funnel from the `Ads` tab.
 - Funnel card rows with zero `Total Revenue` are ignored; if no positive-revenue ad exists for that stage, the card shows `N/A`.
-- `% Of Revenue From Ads` is rounded to a whole percent for client-facing consistency.
+- The top ad rule is revenue-first. A lower-sales ad can win if it has the highest `Total Revenue`.
+- `Company Revenue` and `% Of Revenue From Ads` are manual client-provided values for now; generated reports leave them at `$0.00` and `0%`.
+- `% Of Revenue From Ads` stays `0%` until the technician enters client-provided company revenue manually.
 - Use `workflows/template_placeholder_map.md` as the source of truth for template creation.
 
 ## Dry-Run Audit
@@ -87,7 +91,7 @@ python3 tools/run_google_slides_report.py \
   --thumbnail-audit
 ```
 
-By default this uses deterministic insights. Use `--insights-provider anthropic`, `openai`, or `auto` only when you want AI narrative and accept provider/API usage.
+By default this uses AI narratives through `auto`. Configure `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before real runs.
 
 ## Run All Clients From The Control Sheet
 ```bash
@@ -95,7 +99,7 @@ python3 tools/run_control_sheet_reports.py \
   --control-sheet "MASTER_CONTROL_SHEET_URL_OR_ID" \
   --run-mode all \
   --month March --year 2026 \
-  --insights-provider deterministic
+  --insights-provider auto
 ```
 
 To run one client only:
@@ -150,3 +154,4 @@ Phase rollout:
 - The Docker image must build successfully from the repo root.
 - Run `--audit-only` against the real template before generating a client deck.
 - Do not ship a template that reports `missing_values`.
+- For current-month tests such as April, do not generate a deck until both `Campaigns` and `Ads` contain rows for the requested client/month/year.

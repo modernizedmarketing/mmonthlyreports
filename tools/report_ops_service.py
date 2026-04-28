@@ -50,7 +50,7 @@ def _normalize_run_request(payload: dict[str, str]) -> dict[str, str]:
         raise ValueError("client_key is required when run_mode is 'one'.")
     month = payload.get("month", "").strip()
     year = payload.get("year", "").strip()
-    insights_provider = payload.get("insights_provider", "deterministic").strip().lower() or "deterministic"
+    insights_provider = payload.get("insights_provider", "auto").strip().lower() or "auto"
     if not month or not year:
         raise ValueError("month and year are required.")
     return {
@@ -126,12 +126,12 @@ def render_dashboard_html(clients: list[dict], message: str = "", error: str = "
 
         <label for="insights_provider">Insights provider</label>
         <select id="insights_provider" name="insights_provider">
-          <option value="deterministic">deterministic</option>
           <option value="auto">auto</option>
           <option value="anthropic">anthropic</option>
           <option value="openai">openai</option>
+          <option value="deterministic">deterministic</option>
         </select>
-        <small>Use deterministic for no-credit-risk runs. Auto tries Anthropic, then OpenAI, then deterministic.</small>
+        <small>Use auto for real runs. It requires Anthropic or OpenAI and does not fall back to deterministic.</small>
 
         <button type="submit">Launch run</button>
       </form>

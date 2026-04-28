@@ -32,7 +32,7 @@ class ControlSheetClient:
     campaigns_tab: str = "Campaigns"
     ads_tab: str = "Ads"
     timezone: str = ""
-    insights_provider: str = "deterministic"
+    insights_provider: str = "auto"
 
 
 def _normalize_column(value: str) -> str:
@@ -82,7 +82,7 @@ def load_control_sheet_clients(
         ads_tab = str(row.get(normalized.get("ads_tab", ""), "")).strip() or "Ads"
         timezone_value = str(row.get(normalized.get("timezone", ""), "")).strip()
         insights_provider = (
-            str(row.get(normalized.get("insights_provider", ""), "")).strip().lower() or "deterministic"
+            str(row.get(normalized.get("insights_provider", ""), "")).strip().lower() or "auto"
         )
 
         client = ControlSheetClient(

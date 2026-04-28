@@ -412,19 +412,19 @@ def build_replacements(
     prev_totals = prev_kpis.get("totals", {}) if prev_kpis else {}
     ad_revenue = user_overrides.get("ad_revenue") or totals["revenue"]
     ad_cost = user_overrides.get("ad_cost") or totals["cost"]
-    company_revenue = user_overrides.get("company_revenue", 0)
+    company_revenue = 0
 
     slide4_roas = fmt_roas(ad_revenue / ad_cost) if ad_cost else fmt_roas(totals.get("roas", 0))
     slide4_cps = fmt_money(ad_cost / totals["sales"], currency) if totals.get("sales") else fmt_money(0, currency)
-    pct_rev = fmt_pct_whole(ad_revenue / company_revenue * 100) if company_revenue else "0%"
+    pct_rev = "0%"
 
-    p_company_revenue = user_overrides.get("prev_company_revenue", 0)
+    p_company_revenue = 0
     p_ad_revenue = user_overrides.get("prev_ad_revenue") or prev_totals.get("revenue", 0)
     p_ad_cost = user_overrides.get("prev_ad_cost") or prev_totals.get("cost", 0)
     p_sales = prev_totals.get("sales", 0)
     p_slide4_roas = fmt_roas(p_ad_revenue / p_ad_cost) if prev_kpis and p_ad_cost else ""
     p_slide4_cps = fmt_money(p_ad_cost / p_sales, currency) if prev_kpis and p_sales else ""
-    p_pct_rev = fmt_pct_whole(p_ad_revenue / p_company_revenue * 100) if prev_kpis and p_company_revenue else ""
+    p_pct_rev = "0%" if prev_kpis else ""
     action_items = insights.get("action_items", [])
 
     replacements = {

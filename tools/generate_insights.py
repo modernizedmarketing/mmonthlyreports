@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - exercised when dependency is not insta
     OpenAI = None
 
 ANTHROPIC_DEFAULT_MODEL = os.environ.get("ANTHROPIC_INSIGHTS_MODEL", "claude-sonnet-4-6")
+ANTHROPIC_MAX_TOKENS = int(os.environ.get("ANTHROPIC_INSIGHTS_MAX_TOKENS", "8192"))
 OPENAI_DEFAULT_MODEL = os.environ.get("OPENAI_INSIGHTS_MODEL", "gpt-5.4-mini")
 INSIGHT_PROVIDER_CHOICES = {"deterministic", "anthropic", "openai", "auto"}
 
@@ -115,6 +116,7 @@ Ad Cost: ${user_overrides.get('ad_cost', 0):,.2f}
 {special_requests or 'None.'}
 
 Generate the following JSON. Every insight MUST follow DATA → INSIGHT → ACTION framework. Use exact numbers. Never be generic.
+Return compact valid JSON only. Escape line breaks inside string values as \\n; do not put literal newlines inside JSON strings.
 For every *_narrative field, write one complete slide-ready paragraph block with this structure:
 line 1: "1.3M Impressions | 6.1K Clicks | 641.0 Leads | 119 Sales | $7.6K Ad Revenue | $10.9K Ad Spend | $91.7 CPS | 0.7 ROAS"
 line 2: "Distribution: 65.6% ad spend, 22.2% ad revenue, and 27.8% of sales."
@@ -171,7 +173,7 @@ def generate_insights(
 
     response = client_sdk.messages.create(
         model=ANTHROPIC_DEFAULT_MODEL,
-        max_tokens=4096,
+        max_tokens=ANTHROPIC_MAX_TOKENS,
         system=[
             {
                 "type": "text",
@@ -277,16 +279,19 @@ def generate_insights_with_provider(
     if normalized_provider == "openai":
         return generate_openai_insights(**payload), "openai"
 
-    try:
-        if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+    errors = []
+    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        try:
             return generate_insights(**payload), "anthropic"
-    except Exception:
-        pass
+        except Exception as exc:
+            errors.append(f"Anthropic failed: {exc}")
 
-    try:
-        if os.environ.get("OPENAI_API_KEY", "").strip():
+    if os.environ.get("OPENAI_API_KEY", "").strip():
+        try:
             return generate_openai_insights(**payload), "openai"
-    except Exception:
-        pass
+        except Exception as exc:
+            errors.append(f"OpenAI failed: {exc}")
 
-    return deterministic_factory(), "deterministic"
+    if errors:
+        raise InsightProviderError("; ".join(errors))
+    raise InsightProviderError("INSIGHTS_PROVIDER=auto requires ANTHROPIC_API_KEY or OPENAI_API_KEY.")

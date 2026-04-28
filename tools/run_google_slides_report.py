@@ -76,8 +76,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--insights-provider",
         choices=sorted(INSIGHT_PROVIDER_CHOICES),
-        default=os.environ.get("REPORT_INSIGHTS_PROVIDER", "deterministic"),
-        help="Narrative provider. 'auto' tries Anthropic, then OpenAI, then deterministic fallback.",
+        default=os.environ.get("REPORT_INSIGHTS_PROVIDER", "auto"),
+        help="Narrative provider. 'auto' requires Anthropic or OpenAI and never falls back to deterministic.",
     )
     parser.add_argument("--use-claude", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--audit-only", action="store_true", help="Audit template tokens without copying or editing.")
@@ -117,7 +117,7 @@ def build_run_namespace(**overrides) -> argparse.Namespace:
         "currency": os.environ.get("REPORT_CURRENCY", "USD"),
         "media_buyer_notes": "",
         "special_requests": "",
-        "insights_provider": os.environ.get("REPORT_INSIGHTS_PROVIDER", "deterministic"),
+        "insights_provider": os.environ.get("REPORT_INSIGHTS_PROVIDER", "auto"),
         "use_claude": False,
         "audit_only": False,
         "skip_run_log": False,
@@ -167,12 +167,12 @@ def ensure_supported_python_version() -> None:
 
 
 def resolve_requested_provider(args: argparse.Namespace) -> str:
-    provider = getattr(args, "insights_provider", "deterministic")
+    provider = getattr(args, "insights_provider", "auto")
     if getattr(args, "use_claude", False):
         if provider not in {"", "deterministic", "anthropic"}:
             raise ValueError("--use-claude cannot be combined with a non-Anthropic insights provider.")
         provider = "anthropic"
-    normalized = (provider or "deterministic").strip().lower()
+    normalized = (provider or "auto").strip().lower()
     if normalized not in INSIGHT_PROVIDER_CHOICES:
         raise ValueError(
             f"Unsupported insights provider {provider!r}. Expected one of {sorted(INSIGHT_PROVIDER_CHOICES)}."
@@ -186,10 +186,23 @@ def validate_runtime_inputs(args: argparse.Namespace) -> None:
     if args.audit_only:
         return
     provider = resolve_requested_provider(args)
+    if provider == "auto" and not (
+        os.environ.get("ANTHROPIC_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()
+    ):
+        raise EnvironmentError("INSIGHTS_PROVIDER=auto requires ANTHROPIC_API_KEY or OPENAI_API_KEY.")
     if provider == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
         raise EnvironmentError("ANTHROPIC_API_KEY is required when insights provider is 'anthropic'.")
     if provider == "openai" and not os.environ.get("OPENAI_API_KEY", "").strip():
         raise EnvironmentError("OPENAI_API_KEY is required when insights provider is 'openai'.")
+
+
+def ensure_report_data_available(df, sheet_name: str, client: str, month: str, year: int) -> None:
+    is_empty = bool(getattr(df, "empty", False)) if hasattr(df, "empty") else len(df) == 0
+    if is_empty:
+        raise ValueError(
+            f"No report data found in {sheet_name!r} for client {client!r} and period {month} {year}. "
+            "Load closed data into both Campaigns and Ads before generating this report."
+        )
 
 
 def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
@@ -242,6 +255,8 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         month=window.month,
         year=window.year,
     )
+    ensure_report_data_available(campaigns, args.campaigns_sheet, args.client, window.month, window.year)
+    ensure_report_data_available(ads, args.ads_sheet, args.client, window.month, window.year)
     checkpoints = validate_or_raise(campaigns)
     kpis = build_full_kpi_report(campaigns, ads)
 
@@ -261,6 +276,8 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         month=window.prev_month,
         year=window.prev_year,
     )
+    ensure_report_data_available(prev_campaigns, args.campaigns_sheet, args.client, window.prev_month, window.prev_year)
+    ensure_report_data_available(prev_ads, args.ads_sheet, args.client, window.prev_month, window.prev_year)
     prev_checkpoints = validate_or_raise(prev_campaigns)
     prev_kpis = build_full_kpi_report(prev_campaigns, prev_ads)
 
@@ -281,15 +298,10 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         window.prev_year,
     )
     overrides = {
-        "company_revenue": _manual_or_arg(manual_inputs, args, "company_revenue"),
+        "company_revenue": 0,
         "ad_revenue": _manual_or_arg(manual_inputs, args, "ad_revenue"),
         "ad_cost": _manual_or_arg(manual_inputs, args, "ad_cost"),
-        "prev_company_revenue": _manual_or_arg(
-            prev_manual_inputs,
-            args,
-            "prev_company_revenue",
-            manual_key="company_revenue",
-        ),
+        "prev_company_revenue": 0,
         "prev_ad_revenue": _manual_or_arg(
             prev_manual_inputs,
             args,
