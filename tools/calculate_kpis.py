@@ -162,6 +162,8 @@ def calculate_funnel_top_ads(df: pd.DataFrame, platform: str) -> dict:
         impressions = float(row.get("Impressions", 0))
         result[funnel] = {
             "source": _clean_source_name(row),
+            "export_stage_revenue": float(f["Total Revenue"].sum()),
+            "export_stage_cost": float(p[p["Funnel"].str.upper() == funnel]["Cost"].sum()),
             "source_link": _clean_source_link(row),
             "cost": round(cost, 2),
             "revenue": round(revenue, 2),

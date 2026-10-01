@@ -107,6 +107,7 @@ def parse_args() -> argparse.Namespace:
         help="Narrative provider. 'auto' requires Anthropic or OpenAI and never falls back to deterministic.",
     )
     parser.add_argument("--use-claude", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--insights-file", default="", help="Reviewed narrative JSON with client, month, year, and insights; avoids an external AI call.")
     parser.add_argument("--audit-only", action="store_true", help="Audit template tokens without copying or editing.")
     parser.add_argument("--skip-run-log", action="store_true")
     parser.add_argument("--skip-kpi-output", action="store_true")
@@ -155,6 +156,7 @@ def build_run_namespace(**overrides) -> argparse.Namespace:
         "special_requests": "",
         "insights_provider": os.environ.get("REPORT_INSIGHTS_PROVIDER", "auto"),
         "use_claude": False,
+        "insights_file": "",
         "audit_only": False,
         "skip_run_log": False,
         "skip_kpi_output": False,
@@ -217,6 +219,8 @@ def ensure_supported_python_version() -> None:
 
 
 def resolve_requested_provider(args: argparse.Namespace) -> str:
+    if getattr(args, "insights_file", ""):
+        return "reviewed_file"
     provider = getattr(args, "insights_provider", "auto")
     if getattr(args, "use_claude", False):
         if provider not in {"", "deterministic", "anthropic"}:
@@ -236,6 +240,8 @@ def validate_runtime_inputs(args: argparse.Namespace) -> None:
     if args.audit_only:
         return
     provider = resolve_requested_provider(args)
+    if provider == "reviewed_file":
+        load_reviewed_insights(args)
     if provider == "auto" and not (
         os.environ.get("ANTHROPIC_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()
     ):
@@ -244,6 +250,18 @@ def validate_runtime_inputs(args: argparse.Namespace) -> None:
         raise EnvironmentError("ANTHROPIC_API_KEY is required when insights provider is 'anthropic'.")
     if provider == "openai" and not os.environ.get("OPENAI_API_KEY", "").strip():
         raise EnvironmentError("OPENAI_API_KEY is required when insights provider is 'openai'.")
+
+
+def load_reviewed_insights(args: argparse.Namespace) -> dict:
+    payload = json.loads(Path(args.insights_file).read_text())
+    if (payload.get("client"), str(payload.get("month", "")).casefold(), payload.get("year")) != (args.client, args.month.casefold(), args.year):
+        raise ValueError("Reviewed insights do not match the requested client and reporting period.")
+    insights = payload.get("insights", {})
+    assert_insights_shape(insights)
+    for key, value in insights.items():
+        if key != "action_items" and (not isinstance(value, str) or not value.strip()):
+            raise ValueError(f"Reviewed insight {key} must be nonempty text.")
+    return insights
 
 
 def ensure_report_data_available(df, sheet_name: str, client: str, month: str, year: int) -> None:
@@ -435,27 +453,30 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
     if not args.skip_kpi_output:
         write_kpi_output(services["sheets"], spreadsheet_id, kpis, sheet_name=args.kpi_output_sheet)
 
-    insights, used_provider = generate_insights_with_provider(
-        requested_provider,
-        client=args.client,
-        month=window.month,
-        year=window.year,
-        prev_month=window.prev_month,
-        prev_year=window.prev_year,
-        kpis=kpis,
-        user_overrides=overrides,
-        media_buyer_notes=args.media_buyer_notes or str(manual_inputs.get("media_buyer_notes", "")),
-        special_requests=args.special_requests or str(manual_inputs.get("special_requests", "")),
-        currency=currency,
-        deterministic_factory=lambda: build_fake_insights(
-            kpis,
-            args.client,
-            window.month,
-            window.year,
-            window.next_month,
-            currency,
-        ),
-    )
+    if getattr(args, "insights_file", ""):
+        insights, used_provider = load_reviewed_insights(args), "reviewed_file"
+    else:
+        insights, used_provider = generate_insights_with_provider(
+            requested_provider,
+            client=args.client,
+            month=window.month,
+            year=window.year,
+            prev_month=window.prev_month,
+            prev_year=window.prev_year,
+            kpis=kpis,
+            user_overrides=overrides,
+            media_buyer_notes=args.media_buyer_notes or str(manual_inputs.get("media_buyer_notes", "")),
+            special_requests=args.special_requests or str(manual_inputs.get("special_requests", "")),
+            currency=currency,
+            deterministic_factory=lambda: build_fake_insights(
+                kpis,
+                args.client,
+                window.month,
+                window.year,
+                window.next_month,
+                currency,
+            ),
+        )
     assert_insights_shape(insights)
     if requested_provider == "auto" and used_provider != "auto":
         insights_mode = f"auto->{used_provider}"
@@ -473,6 +494,14 @@ def run_report(args: argparse.Namespace, services: dict | None = None) -> dict:
         overrides,
         prev_kpis=prev_kpis,
     )
+    if first_month_baseline:
+        replacements.update({key: "N/A" for key in replacements if key.endswith("_PREV}}")})
+    if not kpis["totals"].get("sales"):
+        replacements["{{SLIDE4_CPS}}"] = "N/A"
+        replacements["{{SLIDE4_AOV}}"] = "N/A"
+    for platform in ("google", "meta", "bing"):
+        if not kpis.get(platform, {}).get("sales"):
+            replacements[f"{{{{{platform.upper()}_CPS}}}}"] = "N/A"
 
     template_placeholders = read_placeholders(services["slides"], template_id)
     audit = audit_placeholders(template_placeholders, set(replacements))

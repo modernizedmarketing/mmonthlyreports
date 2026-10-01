@@ -286,6 +286,14 @@ def build_funnel_narrative(
             f"{fmt_int(top_ad.get('sales', 0))} sales and {fmt_money_whole(top_ad.get('revenue', 0), currency)} revenue, "
             f"which is around {fmt_pct_whole(contribution)} of funnel stage revenue."
         )
+        if (abs(top_ad.get("export_stage_revenue", funnel_data.get("revenue", 0)) - funnel_data.get("revenue", 0)) > 0.05
+                or abs(top_ad.get("export_stage_cost", funnel_data.get("cost", 0)) - funnel_data.get("cost", 0)) > 0.05):
+            performer = (
+                f"Top ad in the uploaded Ads view: {top_ad.get('source', 'N/A')}: "
+                f"{fmt_money_whole(top_ad.get('revenue', 0), currency)} revenue; "
+                f"{fmt_int(top_ad.get('sales', 0))} sales; {fmt_roas_card(top_ad.get('roas', 0))} ROAS. "
+                "Ads and Campaigns totals differ; reconcile before scaling."
+            )
     else:
         performer = "Top Performer: No positive-revenue ad was available for this funnel stage."
     action = next_steps or f"Next Steps: Review {platform_name} {stage} performance and refine budget, targeting, and creative based on this stage's efficiency."
